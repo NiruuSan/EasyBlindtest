@@ -3,7 +3,7 @@
   line-height: 1.5;
   font-weight: 400;
   color: #111111;
-  background: #f4f7f2;
+  background: #f6f4fb;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -25,8 +25,8 @@ body {
   overflow-x: clip;
   color: #111111;
   background:
-    radial-gradient(circle at top, rgba(76, 255, 76, 0.1), transparent 34%),
-    linear-gradient(180deg, rgba(248, 251, 246, 1) 0%, rgba(235, 241, 233, 1) 100%);
+    radial-gradient(circle at top, rgba(141, 124, 255, 0.1), transparent 34%),
+    linear-gradient(180deg, rgba(250, 248, 253, 1) 0%, rgba(239, 235, 247, 1) 100%);
 }
 
 body,
