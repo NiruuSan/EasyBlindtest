@@ -984,6 +984,46 @@ function createSongKey(artistName, title) {
   return `${normalizeText(artistName)}::${normalizeText(title)}`
 }
 
+function normalizeTrackTitle(title) {
+  return normalizeText(
+    title
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/\s+-\s+(remix|mix|edit|version|ver\.?|live|acoustic|instrumental|karaoke|remaster(?:ed)?).*$/i, '')
+      .trim(),
+  )
+}
+
+function shouldRejectTrackVersion(track) {
+  const searchableText = `${track.trackName ?? ''} ${track.collectionName ?? ''} ${track.artistName ?? ''}`
+  const normalized = normalizeText(searchableText)
+  const blockedPatterns = [
+    /\bremix\b/,
+    /\bremaster(?:ed)?\b/,
+    /\bkaraoke\b/,
+    /\binstrumental\b/,
+    /\bacoustic\b/,
+    /\blive\b/,
+    /\bcover\b/,
+    /\btribute\b/,
+    /\bsped up\b/,
+    /\bslowed\b/,
+    /\bnightcore\b/,
+    /\b8d\b/,
+    /\bmix\b/,
+    /\bedit\b/,
+    /\bmovie version\b/,
+    /\btv size\b/,
+    /\bshort ver\b/,
+    /\benglish ver\b/,
+    /\bjapanese ver\b/,
+    /\bpiano version\b/,
+    /\borchestral version\b/,
+  ]
+
+  return blockedPatterns.some((pattern) => pattern.test(normalized))
+}
+
 function getPlaylistType(playlist) {
   return playlist.type ?? 'artist'
 }
@@ -1056,7 +1096,11 @@ function createRounds(tracks, roundCount) {
 
   return correctTracks.map((correctTrack) => {
     const distractors = pickRandomItems(
-      tracks.filter((track) => track.songKey !== correctTrack.songKey),
+      tracks.filter(
+        (track) =>
+          track.songKey !== correctTrack.songKey &&
+          track.titleKey !== correctTrack.titleKey,
+      ),
       3,
     )
 
@@ -1129,6 +1173,7 @@ async function fetchSongsForArtist(artist) {
     .map((track) => ({
       id: String(track.trackId ?? `${track.artistId}-${track.trackName}`),
       songKey: createSongKey(track.artistName ?? artist.artistName, track.trackName),
+      titleKey: normalizeTrackTitle(track.trackName),
       title: track.trackName,
       artistName: track.artistName ?? artist.artistName,
       previewUrl: track.previewUrl,
@@ -1145,24 +1190,14 @@ async function searchTracksByQuery(query) {
     limit: '10',
   })
   const data = await fetchItunes('search', params)
-  const seenTracks = new Set()
-
-  return (data.results ?? [])
+  const candidates = (data.results ?? [])
     .filter((item) => item.wrapperType === 'track' && item.kind === 'song')
     .filter((item) => item.previewUrl && item.trackName)
-    .filter((item) => {
-      const key = createSongKey(item.artistName, item.trackName)
-
-      if (seenTracks.has(key)) {
-        return false
-      }
-
-      seenTracks.add(key)
-      return true
-    })
+    .filter((item) => !shouldRejectTrackVersion(item))
     .map((track) => ({
       id: String(track.trackId ?? `${track.artistId}-${track.trackName}`),
       songKey: createSongKey(track.artistName, track.trackName),
+      titleKey: normalizeTrackTitle(track.trackName),
       title: track.trackName,
       artistName: track.artistName,
       previewUrl: track.previewUrl,
@@ -1170,6 +1205,27 @@ async function searchTracksByQuery(query) {
         track.artworkUrl100?.replace('100x100bb', '300x300bb') ?? track.artworkUrl100 ?? '',
       collectionName: track.collectionName ?? 'Single',
     }))
+
+  if (candidates.length > 0) {
+    return [candidates[0]]
+  }
+
+  const fallback = (data.results ?? [])
+    .filter((item) => item.wrapperType === 'track' && item.kind === 'song')
+    .filter((item) => item.previewUrl && item.trackName)
+    .map((track) => ({
+      id: String(track.trackId ?? `${track.artistId}-${track.trackName}`),
+      songKey: createSongKey(track.artistName, track.trackName),
+      titleKey: normalizeTrackTitle(track.trackName),
+      title: track.trackName,
+      artistName: track.artistName,
+      previewUrl: track.previewUrl,
+      artwork:
+        track.artworkUrl100?.replace('100x100bb', '300x300bb') ?? track.artworkUrl100 ?? '',
+      collectionName: track.collectionName ?? 'Single',
+    }))
+
+  return fallback.length > 0 ? [fallback[0]] : []
 }
 
 async function resolveSelectedPlaylistArtists(playlists, roundCount) {
