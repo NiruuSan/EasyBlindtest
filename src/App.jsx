@@ -13,6 +13,208 @@ const MAX_PLAYLIST_ARTISTS_PER_GAME = 20
 const MIN_PLAYLIST_ARTISTS_PER_GAME = 10
 const MAX_TRACK_QUERIES_PER_GAME = 18
 const MIN_TRACK_QUERIES_PER_GAME = 10
+const TRACK_QUERY_DISPLAY_LABELS = {
+  'Let It Go Frozen': 'Frozen',
+  'Into the Unknown Frozen 2': 'Frozen 2',
+  'For the First Time in Forever Frozen': 'Frozen',
+  "How Far I'll Go Moana": 'Moana',
+  "You're Welcome Moana": 'Moana',
+  'Part of Your World The Little Mermaid': 'The Little Mermaid',
+  'Under the Sea The Little Mermaid': 'The Little Mermaid',
+  'A Whole New World Aladdin': 'Aladdin',
+  'Friend Like Me Aladdin': 'Aladdin',
+  'Prince Ali Aladdin': 'Aladdin',
+  'Belle Beauty and the Beast': 'Beauty and the Beast',
+  'Be Our Guest Beauty and the Beast': 'Beauty and the Beast',
+  'Circle of Life The Lion King': 'The Lion King',
+  'Hakuna Matata The Lion King': 'The Lion King',
+  'Can You Feel the Love Tonight The Lion King': 'The Lion King',
+  "I Just Can't Wait to Be King The Lion King": 'The Lion King',
+  "I'll Make a Man Out of You Mulan": 'Mulan',
+  'Reflection Mulan': 'Mulan',
+  'Colors of the Wind Pocahontas': 'Pocahontas',
+  'Just Around the Riverbend Pocahontas': 'Pocahontas',
+  'Go the Distance Hercules': 'Hercules',
+  'Zero to Hero Hercules': 'Hercules',
+  "You'll Be in My Heart Tarzan": 'Tarzan',
+  'Strangers Like Me Tarzan': 'Tarzan',
+  'When Will My Life Begin Tangled': 'Tangled',
+  'I See the Light Tangled': 'Tangled',
+  'Almost There Princess and the Frog': 'The Princess and the Frog',
+  'Dig a Little Deeper Princess and the Frog': 'The Princess and the Frog',
+  'Surface Pressure Encanto': 'Encanto',
+  "We Don't Talk About Bruno Encanto": 'Encanto',
+  'Dos Oruguitas Encanto': 'Encanto',
+  'Remember Me Coco': 'Coco',
+  'Un Poco Loco Coco': 'Coco',
+  'Try Everything Zootopia': 'Zootopia',
+  'Speechless Aladdin 2019': 'Aladdin',
+  'How Does a Moment Last Forever Beauty and the Beast': 'Beauty and the Beast',
+  'Breaking Free High School Musical': 'High School Musical',
+  'Start of Something New High School Musical': 'High School Musical',
+  'Bop to the Top High School Musical': 'High School Musical',
+  'What Time Is It High School Musical 2': 'High School Musical 2',
+  'Gotta Go My Own Way High School Musical 2': 'High School Musical 2',
+  'This Is Me Camp Rock': 'Camp Rock',
+  "Wouldn't Change a Thing Camp Rock 2": 'Camp Rock 2',
+  'The Climb Hannah Montana': 'Hannah Montana',
+  'Best of Both Worlds Hannah Montana': 'Hannah Montana',
+  'Rotten to the Core Descendants': 'Descendants',
+  'If Only Descendants': 'Descendants',
+  'Call Me Beep Me Kim Possible': 'Kim Possible',
+  'Hawaiian Roller Coaster Ride Lilo & Stitch': 'Lilo & Stitch',
+  'Once Upon a Dream Sleeping Beauty Disney': 'Sleeping Beauty',
+  'Gurenge Demon Slayer': 'Demon Slayer',
+  'Homura Demon Slayer': 'Demon Slayer',
+  'Blue Bird Naruto': 'Naruto',
+  'Silhouette Naruto Shippuden': 'Naruto Shippuden',
+  'Haruka Kanata Naruto': 'Naruto',
+  'Sign Naruto Shippuden': 'Naruto Shippuden',
+  'Cha-La Head-Cha-La Dragon Ball Z': 'Dragon Ball Z',
+  'Limit Break x Survivor Dragon Ball Super': 'Dragon Ball Super',
+  'Unravel Tokyo Ghoul': 'Tokyo Ghoul',
+  'Again Fullmetal Alchemist Brotherhood': 'Fullmetal Alchemist: Brotherhood',
+  'The Hero One Punch Man': 'One Punch Man',
+  "A Cruel Angel's Thesis Neon Genesis Evangelion": 'Neon Genesis Evangelion',
+  'Tank Cowboy Bebop': 'Cowboy Bebop',
+  'We Are One Piece': 'One Piece',
+  'The World Death Note': 'Death Note',
+  'Guren no Yumiya Attack on Titan': 'Attack on Titan',
+  'Shinzou wo Sasageyo Attack on Titan': 'Attack on Titan',
+  'Red Swan Attack on Titan': 'Attack on Titan',
+  'My War Attack on Titan': 'Attack on Titan',
+  'Crossing Field Sword Art Online': 'Sword Art Online',
+  'Ignite Sword Art Online': 'Sword Art Online',
+  'This Game No Game No Life': 'No Game No Life',
+  'Again Your Lie in April': 'Your Lie in April',
+  'Sparkle Your Name': 'Your Name',
+  'Zenzenzense Your Name': 'Your Name',
+  'Grand Escape Weathering With You': 'Weathering With You',
+  'Kyouran Hey Kids Noragami': 'Noragami',
+  'GO!!! Naruto': 'Naruto',
+  'Kaikai Kitan Jujutsu Kaisen': 'Jujutsu Kaisen',
+  'Specialz Jujutsu Kaisen': 'Jujutsu Kaisen',
+  'Kick Back Chainsaw Man': 'Chainsaw Man',
+  'Mixed Nuts Spy x Family': 'Spy x Family',
+  'Idol Oshi no Ko': 'Oshi no Ko',
+  'Peace Sign My Hero Academia': 'My Hero Academia',
+  'Odd Future My Hero Academia': 'My Hero Academia',
+  'Inferno Fire Force': 'Fire Force',
+  'Cry Baby Tokyo Revengers': 'Tokyo Revengers',
+  'Colors Code Geass': 'Code Geass',
+  'Black Rover Black Clover': 'Black Clover',
+  'Fly High Haikyuu': 'Haikyuu!!',
+  'Imagination Haikyuu': 'Haikyuu!!',
+  'Touch Off The Promised Neverland': 'The Promised Neverland',
+  'Brave Shine Fate Stay Night': 'Fate/stay night',
+  'History Maker Yuri on Ice': 'Yuri on Ice',
+  'Hikaru Nara Your Lie in April': 'Your Lie in April',
+  'Renai Circulation Bakemonogatari': 'Bakemonogatari',
+  'Moonlight Densetsu Sailor Moon': 'Sailor Moon',
+  'Melissa Fullmetal Alchemist': 'Fullmetal Alchemist',
+  'Kimi no Shiranai Monogatari Bakemonogatari': 'Bakemonogatari',
+  'Again Black Clover': 'Black Clover',
+  'Super Mario Bros theme': 'Super Mario Bros.',
+  'Bob-Omb Battlefield Super Mario 64': 'Super Mario 64',
+  'Dire Dire Docks Super Mario 64': 'Super Mario 64',
+  'Gusty Garden Galaxy Super Mario Galaxy': 'Super Mario Galaxy',
+  'Jump Up Super Star Super Mario Odyssey': 'Super Mario Odyssey',
+  'Zelda overworld theme': 'The Legend of Zelda',
+  'Gerudo Valley Zelda': 'The Legend of Zelda',
+  'Song of Storms Zelda': 'The Legend of Zelda',
+  'Ballad of the Goddess Skyward Sword': 'The Legend of Zelda: Skyward Sword',
+  'Lost Woods Zelda': 'The Legend of Zelda',
+  'Pokemon Red Blue opening theme': 'Pokemon Red/Blue',
+  'Littleroot Town Pokemon': 'Pokemon',
+  'Battle Cynthia Pokemon': 'Pokemon',
+  'Driftveil City Pokemon': 'Pokemon',
+  'Route 1 Pokemon Black White': 'Pokemon Black/White',
+  'Green Hill Zone Sonic': 'Sonic the Hedgehog',
+  'City Escape Sonic Adventure 2': 'Sonic Adventure 2',
+  'Live and Learn Sonic Adventure 2': 'Sonic Adventure 2',
+  'Escape From the City Sonic': 'Sonic Adventure 2',
+  'Open Your Heart Sonic Adventure': 'Sonic Adventure',
+  'Simple and Clean Kingdom Hearts': 'Kingdom Hearts',
+  'Sanctuary Kingdom Hearts': 'Kingdom Hearts',
+  'Dearly Beloved Kingdom Hearts': 'Kingdom Hearts',
+  'One Winged Angel Final Fantasy VII': 'Final Fantasy VII',
+  'Aerith Theme Final Fantasy VII': 'Final Fantasy VII',
+  'To Zanarkand Final Fantasy X': 'Final Fantasy X',
+  'Eyes On Me Final Fantasy VIII': 'Final Fantasy VIII',
+  'Prelude Final Fantasy': 'Final Fantasy',
+  'Megalovania Undertale': 'Undertale',
+  'Hopes and Dreams Undertale': 'Undertale',
+  'Spider Dance Undertale': 'Undertale',
+  'Bergentrückung Asgore Undertale': 'Undertale',
+  'Still Alive Portal': 'Portal',
+  'Want You Gone Portal 2': 'Portal 2',
+  'Baba Yetu Civilization IV': 'Civilization IV',
+  'Dragonborn Skyrim': 'The Elder Scrolls V: Skyrim',
+  'Ezio Family Assassin Creed 2': "Assassin's Creed II",
+  'The Wolven Storm Witcher 3': 'The Witcher 3',
+  'Weight of the World Nier Automata': 'NieR:Automata',
+  'Amusement Park Nier Automata': 'NieR:Automata',
+  'BFG Division Doom': 'DOOM',
+  'Rip & Tear Doom': 'DOOM',
+  'I Was Born For This Journey': 'Journey',
+  'Nate Theme Uncharted': 'Uncharted',
+  'The Last of Us main theme': 'The Last of Us',
+  'Snake Eater Metal Gear Solid 3': 'Metal Gear Solid 3',
+  'Tetris theme Korobeiniki': 'Tetris',
+  'Halo theme': 'Halo',
+  'Never Fade Away Cyberpunk 2077': 'Cyberpunk 2077',
+  'Rules of Nature Metal Gear Rising': 'Metal Gear Rising: Revengeance',
+  'My Heart Will Go On Titanic': 'Titanic',
+  'Titanic theme': 'Titanic',
+  'Shallow A Star Is Born': 'A Star Is Born',
+  'City of Stars La La Land': 'La La Land',
+  'Another Day of Sun La La Land': 'La La Land',
+  'Eye of the Tiger Rocky III': 'Rocky III',
+  'Gonna Fly Now Rocky': 'Rocky',
+  'Lose Yourself 8 Mile': '8 Mile',
+  'Footloose movie soundtrack': 'Footloose',
+  'Flashdance What a Feeling': 'Flashdance',
+  'Take My Breath Away Top Gun': 'Top Gun',
+  'Danger Zone Top Gun': 'Top Gun',
+  'Top Gun Maverick Hold My Hand': 'Top Gun: Maverick',
+  'Ghostbusters theme movie': 'Ghostbusters',
+  'Power of Love Back to the Future': 'Back to the Future',
+  'Back in Time Back to the Future': 'Back to the Future',
+  'Mrs Robinson The Graduate': 'The Graduate',
+  'Stayin Alive Saturday Night Fever': 'Saturday Night Fever',
+  'Night Fever Saturday Night Fever': 'Saturday Night Fever',
+  'What Ive Done Transformers': 'Transformers',
+  'I Dont Want to Miss a Thing Armageddon': 'Armageddon',
+  'Kiss From a Rose Batman Forever': 'Batman Forever',
+  'Everything I Do I Do It For You Robin Hood Prince of Thieves': 'Robin Hood: Prince of Thieves',
+  'Gangstas Paradise Dangerous Minds': 'Dangerous Minds',
+  'Dont You Forget About Me The Breakfast Club': 'The Breakfast Club',
+  'Unchained Melody Ghost movie': 'Ghost',
+  'Pretty Woman soundtrack': 'Pretty Woman',
+  'Happy Despicable Me 2': 'Despicable Me 2',
+  'Sunflower Spider-Man Into the Spider-Verse': 'Spider-Man: Into the Spider-Verse',
+  'Calling Spider-Man Across the Spider-Verse': 'Spider-Man: Across the Spider-Verse',
+  'This Is Halloween Nightmare Before Christmas': 'The Nightmare Before Christmas',
+  'Ghostbusters Ray Parker Jr': 'Ghostbusters',
+  'The Imperial March Star Wars': 'Star Wars',
+  'Star Wars main theme': 'Star Wars',
+  'Hedwig Theme Harry Potter': 'Harry Potter',
+  'Concerning Hobbits Lord of the Rings': 'The Lord of the Rings',
+  'Misty Mountains The Hobbit': 'The Hobbit',
+  'James Bond theme': 'James Bond',
+  'Skyfall James Bond': 'Skyfall',
+  'Writings on the Wall Spectre': 'Spectre',
+  'Time Inception': 'Inception',
+  'Cornfield Chase Interstellar': 'Interstellar',
+  'Now We Are Free Gladiator': 'Gladiator',
+  'He Is a Pirate Pirates of the Caribbean': 'Pirates of the Caribbean',
+  'A Thousand Years Twilight Breaking Dawn': 'Twilight: Breaking Dawn',
+  'Can You Feel the Love Tonight movie': 'The Lion King',
+  'The Time of My Life Dirty Dancing': 'Dirty Dancing',
+  'Jai Ho Slumdog Millionaire': 'Slumdog Millionaire',
+  'Falling Slowly Once movie': 'Once',
+  'Remember Me Coco movie': 'Coco',
+}
 const PREMADE_PLAYLISTS = [
   {
     id: 'pop-icons',
@@ -1213,6 +1415,9 @@ function createNormalizedTrack({
     id: `${provider}:${id}`,
     songKey: createSongKey(artistName, title),
     titleKey: normalizeTrackTitle(title),
+    answerKey: normalizeTrackTitle(title),
+    displayTitle: title,
+    displaySubtitle: artistName,
     title,
     artistName,
     previewUrl,
@@ -1335,6 +1540,21 @@ function mergeTrackResults(trackGroups) {
   return Array.from(mergedTracks.values())
 }
 
+function applyTrackDisplayMetadata(track, query) {
+  const displayLabel = TRACK_QUERY_DISPLAY_LABELS[query]
+
+  if (!displayLabel) {
+    return track
+  }
+
+  return {
+    ...track,
+    answerKey: normalizeText(displayLabel),
+    displayTitle: displayLabel,
+    displaySubtitle: track.artistName,
+  }
+}
+
 async function fetchItunes(endpoint, params, signal) {
   const response = await fetch(`/api/itunes/${endpoint}?${params.toString()}`, signal ? { signal } : undefined)
 
@@ -1430,20 +1650,31 @@ function createRounds(tracks, roundCount) {
     throw new Error('Select artists with at least 4 previewable tracks to start a blindtest.')
   }
 
-  if (tracks.length < roundCount) {
+  const uniqueCorrectTracks = []
+  const seenAnswers = new Set()
+
+  shuffle(tracks).forEach((track) => {
+    const answerKey = track.answerKey ?? track.titleKey
+
+    if (!seenAnswers.has(answerKey) && uniqueCorrectTracks.length < roundCount) {
+      seenAnswers.add(answerKey)
+      uniqueCorrectTracks.push(track)
+    }
+  })
+
+  if (uniqueCorrectTracks.length < roundCount) {
     throw new Error(
       `Not enough unique preview clips were found for ${roundCount} rounds. Try fewer rounds or add more artists.`,
     )
   }
 
-  const correctTracks = pickRandomItems(tracks, roundCount)
-
-  return correctTracks.map((correctTrack) => {
+  return uniqueCorrectTracks.map((correctTrack) => {
     const distractors = pickRandomItems(
       tracks.filter(
         (track) =>
           track.songKey !== correctTrack.songKey &&
-          track.titleKey !== correctTrack.titleKey,
+          track.titleKey !== correctTrack.titleKey &&
+          (track.answerKey ?? track.titleKey) !== (correctTrack.answerKey ?? correctTrack.titleKey),
       ),
       3,
     )
@@ -1585,7 +1816,9 @@ async function searchTracksByQuery(query) {
     searchItunesTracksByQuery(query),
     searchDeezerTracksByQuery(query),
   ])
-  const candidates = mergeTrackResults(trackGroups).filter((track) => !shouldRejectTrackVersion(track))
+  const candidates = mergeTrackResults(trackGroups)
+    .filter((track) => !shouldRejectTrackVersion(track))
+    .map((track) => applyTrackDisplayMetadata(track, query))
 
   if (candidates.length > 0) {
     return [candidates[0]]
@@ -1645,16 +1878,20 @@ async function resolveTrackPlaylistTracks(playlists, roundCount) {
   const trackGroups = await Promise.all(sampledQueries.map(searchTracksByQuery))
   const seenTracks = new Set()
   const seenTitles = new Set()
+  const seenAnswers = new Set()
 
   return trackGroups
     .flat()
     .filter((track) => {
-      if (seenTracks.has(track.songKey) || seenTitles.has(track.titleKey)) {
+      const answerKey = track.answerKey ?? track.titleKey
+
+      if (seenTracks.has(track.songKey) || seenTitles.has(track.titleKey) || seenAnswers.has(answerKey)) {
         return false
       }
 
       seenTracks.add(track.songKey)
       seenTitles.add(track.titleKey)
+      seenAnswers.add(answerKey)
       return true
     })
 }
@@ -2096,8 +2333,8 @@ function GamePage({
                       <div className="choice-artwork placeholder" aria-hidden="true" />
                     )}
                     <div>
-                      <strong>{option.title}</strong>
-                      <small>{option.artistName}</small>
+                      <strong>{option.displayTitle ?? option.title}</strong>
+                      <small>{option.displaySubtitle ?? option.artistName}</small>
                     </div>
                   </button>
                 )
@@ -2119,15 +2356,20 @@ function GamePage({
                   {roundResult.correctTrack.artwork ? (
                     <img
                       src={roundResult.correctTrack.artwork}
-                      alt={roundResult.correctTrack.title}
+                      alt={roundResult.correctTrack.displayTitle ?? roundResult.correctTrack.title}
                       className="artwork"
                     />
                   ) : null}
 
                   <div>
                     <p className="reveal-label">Correct answer</p>
-                    <h3>{roundResult.correctTrack.title}</h3>
-                    <p>{roundResult.correctTrack.artistName}</p>
+                    <h3>{roundResult.correctTrack.displayTitle ?? roundResult.correctTrack.title}</h3>
+                    <p>
+                      {roundResult.correctTrack.displayTitle &&
+                      roundResult.correctTrack.displayTitle !== roundResult.correctTrack.title
+                        ? `${roundResult.correctTrack.title} • ${roundResult.correctTrack.artistName}`
+                        : roundResult.correctTrack.artistName}
+                    </p>
                     <small>{roundResult.correctTrack.collectionName}</small>
                   </div>
                 </div>
@@ -2154,9 +2396,14 @@ function GamePage({
                 <div key={item.roundNumber} className="history-item">
                   <div>
                     <strong>
-                      Round {item.roundNumber}: {item.correctTrack.title}
+                      Round {item.roundNumber}: {item.correctTrack.displayTitle ?? item.correctTrack.title}
                     </strong>
-                    <small>{item.correctTrack.artistName}</small>
+                    <small>
+                      {item.correctTrack.displayTitle &&
+                      item.correctTrack.displayTitle !== item.correctTrack.title
+                        ? `${item.correctTrack.title} • ${item.correctTrack.artistName}`
+                        : item.correctTrack.artistName}
+                    </small>
                   </div>
                   <span className={item.isCorrect ? 'history-score success-text' : 'history-score'}>
                     {item.earnedPoints} pts
