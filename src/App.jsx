@@ -10,6 +10,8 @@ const SEARCH_RESULT_LIMIT = 12
 const SONG_FETCH_LIMIT = 200
 const MAX_PLAYLIST_ARTISTS_PER_GAME = 20
 const MIN_PLAYLIST_ARTISTS_PER_GAME = 10
+const MAX_TRACK_QUERIES_PER_GAME = 18
+const MIN_TRACK_QUERIES_PER_GAME = 10
 const PREMADE_PLAYLISTS = [
   {
     id: 'pop-icons',
@@ -830,116 +832,118 @@ const PREMADE_PLAYLISTS = [
     id: 'disney-magic',
     title: 'Disney',
     category: 'Theme',
+    type: 'track',
     description: 'Animated classics, Disney Channel hits, and soundtrack favorites.',
-    artists: [
-      'Walt Disney Records',
-      'Alan Menken',
-      'Phil Collins',
-      'Randy Newman',
-      'Kristen Bell',
-      'Idina Menzel',
-      'Josh Gad',
-      'Mandy Moore',
-      'Zachary Levi',
-      'Auliʻi Cravalho',
-      'Dwayne Johnson',
-      'Lea Salonga',
-      'Brad Kane',
-      'Jodi Benson',
-      'Anika Noni Rose',
-      'Samuel E. Wright',
-      'Paige O\'Hara',
-      'Ilene Woods',
-      'Adriana Caselotti',
-      'Donna Murphy',
-      'Jason Weaver',
-      'Nathan Lane',
-      'Ernie Sabella',
-      'Billy Joel',
-      'The Cheetah Girls',
-      'Miley Cyrus',
-      'Demi Lovato',
-      'Selena Gomez',
-      'Jonas Brothers',
-      'High School Musical Cast',
-      'Vanessa Hudgens',
-      'Ashley Tisdale',
-      'Zac Efron',
-      'Dove Cameron',
-      'Sofia Carson',
-      'China Anne McClain',
-      'Ross Lynch',
-      'Laura Marano',
-      'Sabrina Carpenter',
-      'Hilary Duff',
-      'Raven-Symoné',
-      'Bridgit Mendler',
-      'Olivia Rodrigo',
-      'Joshua Bassett',
-      'Troy',
-      'Camp Rock',
-      'Beauty and the Beast',
-      'Frozen',
-      'Moana',
-      'The Lion King',
+    queries: [
+      'Let It Go Frozen',
+      'Into the Unknown Frozen 2',
+      'For the First Time in Forever Frozen',
+      'How Far I\'ll Go Moana',
+      'You\'re Welcome Moana',
+      'Part of Your World The Little Mermaid',
+      'Under the Sea The Little Mermaid',
+      'A Whole New World Aladdin',
+      'Friend Like Me Aladdin',
+      'Prince Ali Aladdin',
+      'Belle Beauty and the Beast',
+      'Be Our Guest Beauty and the Beast',
+      'Circle of Life The Lion King',
+      'Hakuna Matata The Lion King',
+      'Can You Feel the Love Tonight The Lion King',
+      'I Just Can\'t Wait to Be King The Lion King',
+      'I\'ll Make a Man Out of You Mulan',
+      'Reflection Mulan',
+      'Colors of the Wind Pocahontas',
+      'Just Around the Riverbend Pocahontas',
+      'Go the Distance Hercules',
+      'Zero to Hero Hercules',
+      'You\'ll Be in My Heart Tarzan',
+      'Strangers Like Me Tarzan',
+      'When Will My Life Begin Tangled',
+      'I See the Light Tangled',
+      'Almost There Princess and the Frog',
+      'Dig a Little Deeper Princess and the Frog',
+      'Surface Pressure Encanto',
+      'We Don\'t Talk About Bruno Encanto',
+      'Dos Oruguitas Encanto',
+      'Remember Me Coco',
+      'Un Poco Loco Coco',
+      'Try Everything Zootopia',
+      'Speechless Aladdin 2019',
+      'How Does a Moment Last Forever Beauty and the Beast',
+      'Breaking Free High School Musical',
+      'Start of Something New High School Musical',
+      'Bop to the Top High School Musical',
+      'What Time Is It High School Musical 2',
+      'Gotta Go My Own Way High School Musical 2',
+      'This Is Me Camp Rock',
+      'Wouldn\'t Change a Thing Camp Rock 2',
+      'The Climb Hannah Montana',
+      'Best of Both Worlds Hannah Montana',
+      'Rotten to the Core Descendants',
+      'If Only Descendants',
+      'Call Me Beep Me Kim Possible',
+      'Hawaiian Roller Coaster Ride Lilo & Stitch',
+      'Once Upon a Dream Sleeping Beauty Disney',
     ],
   },
   {
     id: 'anime-anthems',
     title: 'Anime',
     category: 'Theme',
+    type: 'track',
     description: 'Openings, endings, and iconic anime soundtrack songs.',
-    artists: [
-      'LiSA',
-      'FLOW',
-      'YUI',
-      'Aimer',
-      'Linked Horizon',
-      'MAN WITH A MISSION',
-      'TK from Ling tosite sigure',
-      'Spyair',
-      'KANA-BOON',
-      'UVERworld',
-      'ASIAN KUNG-FU GENERATION',
-      'ClariS',
-      'Eir Aoi',
-      'Ikimono-gakari',
-      'Radwimps',
-      'BUMP OF CHICKEN',
-      'Ado',
-      'YOASOBI',
-      'Kenshi Yonezu',
-      'Reol',
-      'Aqua Timez',
-      'DOES',
-      'SID',
-      'NICO Touches the Walls',
-      'BLUE ENCOUNT',
-      'THE ORAL CIGARETTES',
-      'SUPER BEAVER',
-      'My First Story',
-      'Coldrain',
-      'Survive Said The Prophet',
-      'Mika Nakashima',
-      'Scandal',
-      'Porno Graffitti',
-      'Goose house',
-      'The Peggies',
-      'EGOIST',
-      'Supercell',
-      'Kalafina',
-      'milet',
-      'Daoko',
-      'Burnout Syndromes',
-      'Official HIGE DANdism',
-      'Mrs. GREEN APPLE',
-      'TRUE',
-      'fripSide',
-      'Masayoshi Oishi',
-      'SawanoHiroyuki[nZk]',
-      'T.M.Revolution',
-      'JAM Project',
-      'Yoko Takahashi',
+    queries: [
+      'Gurenge Demon Slayer',
+      'Homura Demon Slayer',
+      'Blue Bird Naruto',
+      'Silhouette Naruto Shippuden',
+      'Haruka Kanata Naruto',
+      'Sign Naruto Shippuden',
+      'Cha-La Head-Cha-La Dragon Ball Z',
+      'Limit Break x Survivor Dragon Ball Super',
+      'Unravel Tokyo Ghoul',
+      'Again Fullmetal Alchemist Brotherhood',
+      'The Hero One Punch Man',
+      'A Cruel Angel\'s Thesis Neon Genesis Evangelion',
+      'Tank Cowboy Bebop',
+      'We Are One Piece',
+      'The World Death Note',
+      'Guren no Yumiya Attack on Titan',
+      'Shinzou wo Sasageyo Attack on Titan',
+      'Red Swan Attack on Titan',
+      'My War Attack on Titan',
+      'Crossing Field Sword Art Online',
+      'Ignite Sword Art Online',
+      'This Game No Game No Life',
+      'Again Your Lie in April',
+      'Sparkle Your Name',
+      'Zenzenzense Your Name',
+      'Grand Escape Weathering With You',
+      'Kyouran Hey Kids Noragami',
+      'GO!!! Naruto',
+      'Kaikai Kitan Jujutsu Kaisen',
+      'Specialz Jujutsu Kaisen',
+      'Kick Back Chainsaw Man',
+      'Mixed Nuts Spy x Family',
+      'Idol Oshi no Ko',
+      'Peace Sign My Hero Academia',
+      'Odd Future My Hero Academia',
+      'Inferno Fire Force',
+      'Cry Baby Tokyo Revengers',
+      'Colors Code Geass',
+      'Black Rover Black Clover',
+      'Fly High Haikyuu',
+      'Imagination Haikyuu',
+      'Touch Off The Promised Neverland',
+      'Brave Shine Fate Stay Night',
+      'History Maker Yuri on Ice',
+      'Hikaru Nara Your Lie in April',
+      'Renai Circulation Bakemonogatari',
+      'Moonlight Densetsu Sailor Moon',
+      'Melissa Fullmetal Alchemist',
+      'Kimi no Shiranai Monogatari Bakemonogatari',
+      'Again Black Clover',
     ],
   },
 ]
@@ -980,6 +984,10 @@ function createSongKey(artistName, title) {
   return `${normalizeText(artistName)}::${normalizeText(title)}`
 }
 
+function getPlaylistType(playlist) {
+  return playlist.type ?? 'artist'
+}
+
 async function fetchItunes(endpoint, params, signal) {
   const response = await fetch(`/api/itunes/${endpoint}?${params.toString()}`, signal ? { signal } : undefined)
 
@@ -1009,6 +1017,13 @@ function getPlaylistSampleSize(roundCount, playlistCount) {
   return Math.max(
     MIN_PLAYLIST_ARTISTS_PER_GAME,
     Math.min(MAX_PLAYLIST_ARTISTS_PER_GAME, Math.ceil((roundCount + 8) / Math.max(1, playlistCount))),
+  )
+}
+
+function getTrackPlaylistSampleSize(roundCount, playlistCount) {
+  return Math.max(
+    MIN_TRACK_QUERIES_PER_GAME,
+    Math.min(MAX_TRACK_QUERIES_PER_GAME, roundCount + Math.max(4, playlistCount * 2)),
   )
 }
 
@@ -1123,13 +1138,49 @@ async function fetchSongsForArtist(artist) {
     }))
 }
 
+async function searchTracksByQuery(query) {
+  const params = new URLSearchParams({
+    term: query,
+    entity: 'song',
+    limit: '10',
+  })
+  const data = await fetchItunes('search', params)
+  const seenTracks = new Set()
+
+  return (data.results ?? [])
+    .filter((item) => item.wrapperType === 'track' && item.kind === 'song')
+    .filter((item) => item.previewUrl && item.trackName)
+    .filter((item) => {
+      const key = createSongKey(item.artistName, item.trackName)
+
+      if (seenTracks.has(key)) {
+        return false
+      }
+
+      seenTracks.add(key)
+      return true
+    })
+    .map((track) => ({
+      id: String(track.trackId ?? `${track.artistId}-${track.trackName}`),
+      songKey: createSongKey(track.artistName, track.trackName),
+      title: track.trackName,
+      artistName: track.artistName,
+      previewUrl: track.previewUrl,
+      artwork:
+        track.artworkUrl100?.replace('100x100bb', '300x300bb') ?? track.artworkUrl100 ?? '',
+      collectionName: track.collectionName ?? 'Single',
+    }))
+}
+
 async function resolveSelectedPlaylistArtists(playlists, roundCount) {
-  if (playlists.length === 0) {
+  const artistPlaylists = playlists.filter((playlist) => getPlaylistType(playlist) === 'artist')
+
+  if (artistPlaylists.length === 0) {
     return []
   }
 
-  const sampleSize = getPlaylistSampleSize(roundCount, playlists.length)
-  const sampledArtistNames = playlists.flatMap((playlist) =>
+  const sampleSize = getPlaylistSampleSize(roundCount, artistPlaylists.length)
+  const sampledArtistNames = artistPlaylists.flatMap((playlist) =>
     shuffle(playlist.artists).slice(0, Math.min(sampleSize, playlist.artists.length)),
   )
 
@@ -1156,6 +1207,32 @@ async function resolveSelectedPlaylistArtists(playlists, roundCount) {
   )
 
   return artistMatches.filter(Boolean)
+}
+
+async function resolveTrackPlaylistTracks(playlists, roundCount) {
+  const trackPlaylists = playlists.filter((playlist) => getPlaylistType(playlist) === 'track')
+
+  if (trackPlaylists.length === 0) {
+    return []
+  }
+
+  const sampleSize = getTrackPlaylistSampleSize(roundCount, trackPlaylists.length)
+  const sampledQueries = trackPlaylists.flatMap((playlist) =>
+    shuffle(playlist.queries).slice(0, Math.min(sampleSize, playlist.queries.length)),
+  )
+  const trackGroups = await Promise.all(sampledQueries.map(searchTracksByQuery))
+  const seenTracks = new Set()
+
+  return trackGroups
+    .flat()
+    .filter((track) => {
+      if (seenTracks.has(track.songKey)) {
+        return false
+      }
+
+      seenTracks.add(track.songKey)
+      return true
+    })
 }
 
 async function fetchLeaderboardsForSources(sources, roundCount) {
@@ -1287,10 +1364,20 @@ function SetupPage({
                   <span className="playlist-tag">{playlist.category}</span>
                   <h4>{playlist.title}</h4>
                   <p>{playlist.description}</p>
-                  <small>{playlist.artists.length} artists curated</small>
+                  <small>
+                    {getPlaylistType(playlist) === 'track'
+                      ? `${playlist.queries.length} songs curated`
+                      : `${playlist.artists.length} artists curated`}
+                  </small>
                   <small className="playlist-preview">
-                    {playlist.artists.slice(0, 6).join(' • ')}
-                    {playlist.artists.length > 6 ? ' • ...' : ''}
+                    {getPlaylistType(playlist) === 'track'
+                      ? playlist.queries.slice(0, 4).join(' • ')
+                      : playlist.artists.slice(0, 6).join(' • ')}
+                    {(getPlaylistType(playlist) === 'track'
+                      ? playlist.queries.length > 4
+                      : playlist.artists.length > 6)
+                      ? ' • ...'
+                      : ''}
                   </small>
                 </div>
 
@@ -1329,7 +1416,7 @@ function SetupPage({
           ) : null}
 
           {selectionCount === 0 ? (
-            <div className="empty-state">Add at least one artist to unlock the blindtest.</div>
+            <div className="empty-state">Add at least one artist or playlist to unlock the blindtest.</div>
           ) : (
             <div className="chip-list">
               {selectedPlaylists.map((playlist) => (
@@ -1337,7 +1424,10 @@ function SetupPage({
                   <div>
                     <strong>{playlist.title}</strong>
                     <small>
-                      {playlist.category} playlist • {playlist.artists.length} artists
+                      {playlist.category} playlist •{' '}
+                      {getPlaylistType(playlist) === 'track'
+                        ? `${playlist.queries.length} songs`
+                        : `${playlist.artists.length} artists`}
                     </small>
                   </div>
                   <button type="button" onClick={() => removePlaylist(playlist.id)}>
@@ -1774,7 +1864,14 @@ function App() {
   const currentRound = rounds[roundIndex] ?? null
   const canSearch = searchTerm.trim().length >= 2
   const selectedPlaylistArtistNames = useMemo(
-    () => new Set(selectedPlaylists.flatMap((playlist) => playlist.artists.map((artist) => normalizeText(artist)))),
+    () =>
+      new Set(
+        selectedPlaylists.flatMap((playlist) =>
+          getPlaylistType(playlist) === 'artist'
+            ? playlist.artists.map((artist) => normalizeText(artist))
+            : [],
+        ),
+      ),
     [selectedPlaylists],
   )
   const selectionCount = manualArtists.length + selectedPlaylists.length
@@ -2024,7 +2121,7 @@ function App() {
 
   async function startGame() {
     if (manualArtists.length === 0 && selectedPlaylists.length === 0) {
-      setGameError('Select at least one artist before starting.')
+      setGameError('Select at least one artist or playlist before starting.')
       return
     }
 
@@ -2045,14 +2142,15 @@ function App() {
 
     try {
       const playlistArtists = await resolveSelectedPlaylistArtists(selectedPlaylists, roundCount)
+      const curatedTracks = await resolveTrackPlaylistTracks(selectedPlaylists, roundCount)
       const effectiveSelectedArtists = mergeUniqueArtists(manualArtists, playlistArtists)
 
-      if (effectiveSelectedArtists.length === 0) {
-        throw new Error('Could not load enough artists from the selected playlists.')
+      if (effectiveSelectedArtists.length === 0 && curatedTracks.length === 0) {
+        throw new Error('Could not load enough songs from the selected artists or playlists.')
       }
 
       const trackGroups = await Promise.all(effectiveSelectedArtists.map(fetchSongsForArtist))
-      const tracks = shuffle(trackGroups.flat())
+      const tracks = shuffle([...curatedTracks, ...trackGroups.flat()])
       const nextRounds = createRounds(tracks, roundCount)
       setGameContext({
         leaderboardSources: buildLeaderboardSources(manualArtists, selectedPlaylists),
