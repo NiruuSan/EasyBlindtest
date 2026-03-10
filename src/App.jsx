@@ -492,6 +492,16 @@ function createSongKey(artistName, title) {
   return `${normalizeText(artistName)}::${normalizeText(title)}`
 }
 
+async function fetchItunes(endpoint, params, signal) {
+  const response = await fetch(`/api/itunes/${endpoint}?${params.toString()}`, signal ? { signal } : undefined)
+
+  if (!response.ok) {
+    throw new Error(`iTunes ${endpoint} request failed.`)
+  }
+
+  return response.json()
+}
+
 function buildLeaderboardSources(manualArtists, selectedPlaylists) {
   return [
     ...manualArtists.map((artist) => ({
@@ -567,13 +577,7 @@ async function searchArtists(query, signal) {
     limit: String(SEARCH_RESULT_LIMIT * 4),
   })
 
-  const response = await fetch(`https://itunes.apple.com/search?${params.toString()}`, { signal })
-
-  if (!response.ok) {
-    throw new Error('Artist search failed.')
-  }
-
-  const data = await response.json()
+  const data = await fetchItunes('search', params, signal)
   const seenArtists = new Set()
 
   return (data.results ?? [])
@@ -603,13 +607,7 @@ async function fetchSongsForArtist(artist) {
     limit: String(SONG_FETCH_LIMIT),
   })
 
-  const response = await fetch(`https://itunes.apple.com/lookup?${params.toString()}`)
-
-  if (!response.ok) {
-    throw new Error(`Could not load songs for ${artist.artistName}.`)
-  }
-
-  const data = await response.json()
+  const data = await fetchItunes('lookup', params)
   const seenTracks = new Set()
 
   return (data.results ?? [])
