@@ -8,6 +8,7 @@ const ROUND_OPTIONS = [5, 10, 15, 20]
 const ROUND_DURATION_MS = 30000
 const SEARCH_RESULT_LIMIT = 12
 const SONG_FETCH_LIMIT = 200
+const DEEZER_SONG_FETCH_LIMIT = 100
 const MAX_PLAYLIST_ARTISTS_PER_GAME = 20
 const MIN_PLAYLIST_ARTISTS_PER_GAME = 10
 const MAX_TRACK_QUERIES_PER_GAME = 18
@@ -1090,7 +1091,7 @@ function formatSeconds(ms) {
 }
 
 function normalizeText(text) {
-  return text
+  return (text ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -1100,6 +1101,14 @@ function normalizeText(text) {
 
 function createSongKey(artistName, title) {
   return `${normalizeText(artistName)}::${normalizeText(title)}`
+}
+
+function createArtistKey(artistName) {
+  return normalizeText(artistName)
+}
+
+function normalizeItunesArtwork(url) {
+  return url?.replace('100x100bb', '300x300bb') ?? url ?? ''
 }
 
 function normalizeTrackTitle(title) {
@@ -1113,29 +1122,57 @@ function normalizeTrackTitle(title) {
 }
 
 function shouldRejectTrackVersion(track) {
-  const searchableText = `${track.trackName ?? ''} ${track.collectionName ?? ''} ${track.artistName ?? ''}`
+  const searchableText = `${track.trackName ?? track.title ?? ''} ${track.collectionName ?? track.album?.title ?? ''} ${track.artistName ?? track.artist?.name ?? ''}`
   const normalized = normalizeText(searchableText)
   const blockedPatterns = [
     /\bremix\b/,
     /\bremaster(?:ed)?\b/,
+    /\bre recorded\b/,
     /\bkaraoke\b/,
     /\binstrumental\b/,
     /\bacoustic\b/,
+    /\blo fi\b/,
+    /\blofi\b/,
+    /\bchill mix\b/,
+    /\bchill version\b/,
     /\blive\b/,
     /\bcover\b/,
     /\btribute\b/,
     /\bsped up\b/,
+    /\breverb\b/,
+    /\bslowed reverb\b/,
     /\bslowed\b/,
     /\bnightcore\b/,
     /\b8d\b/,
     /\bmix\b/,
     /\bedit\b/,
+    /\bextended\b/,
+    /\bclub\b/,
+    /\bdance version\b/,
+    /\brework\b/,
+    /\breimagined\b/,
+    /\breimagining\b/,
+    /\barrangement\b/,
+    /\barranged\b/,
+    /\bmedley\b/,
+    /\bmashup\b/,
+    /\bcover version\b/,
+    /\btheme version\b/,
     /\bmovie version\b/,
     /\btv size\b/,
+    /\bfull version\b/,
+    /\btheme song\b/,
     /\bshort ver\b/,
+    /\bshort version\b/,
+    /\blong version\b/,
     /\benglish ver\b/,
+    /\benglish version\b/,
     /\bjapanese ver\b/,
+    /\bjapanese version\b/,
     /\bpiano version\b/,
+    /\bstrings version\b/,
+    /\bviolin version\b/,
+    /\bguitar version\b/,
     /\borchestral version\b/,
   ]
 
@@ -1146,6 +1183,158 @@ function getPlaylistType(playlist) {
   return playlist.type ?? 'artist'
 }
 
+function createNormalizedArtist({
+  artistName,
+  primaryGenreName,
+  artwork,
+  itunesArtistId = null,
+  deezerArtistId = null,
+}) {
+  return {
+    artistId: createArtistKey(artistName),
+    artistName,
+    primaryGenreName: primaryGenreName ?? 'Unknown genre',
+    artwork: artwork ?? '',
+    itunesArtistId,
+    deezerArtistId,
+  }
+}
+
+function createNormalizedTrack({
+  provider,
+  id,
+  artistName,
+  title,
+  previewUrl,
+  artwork,
+  collectionName,
+}) {
+  return {
+    id: `${provider}:${id}`,
+    songKey: createSongKey(artistName, title),
+    titleKey: normalizeTrackTitle(title),
+    title,
+    artistName,
+    previewUrl,
+    artwork: artwork ?? '',
+    collectionName: collectionName ?? 'Single',
+  }
+}
+
+function normalizeItunesArtist(item) {
+  if (!item.artistName) {
+    return null
+  }
+
+  return createNormalizedArtist({
+    artistName: item.artistName,
+    primaryGenreName: item.primaryGenreName,
+    artwork: normalizeItunesArtwork(item.artworkUrl100),
+    itunesArtistId: item.artistId ? String(item.artistId) : null,
+  })
+}
+
+function normalizeDeezerArtist(item) {
+  if (!item?.name) {
+    return null
+  }
+
+  return createNormalizedArtist({
+    artistName: item.name,
+    primaryGenreName: item.nb_fan ? 'Deezer artist' : 'Unknown genre',
+    artwork: item.picture_xl ?? item.picture_big ?? item.picture_medium ?? item.picture ?? '',
+    deezerArtistId: item.id ? String(item.id) : null,
+  })
+}
+
+function normalizeItunesTrack(track, fallbackArtistName = '') {
+  const artistName = track.artistName ?? fallbackArtistName
+
+  if (!artistName || !track.trackName || !track.previewUrl) {
+    return null
+  }
+
+  return createNormalizedTrack({
+    provider: 'itunes',
+    id: String(track.trackId ?? `${track.artistId ?? artistName}-${track.trackName}`),
+    artistName,
+    title: track.trackName,
+    previewUrl: track.previewUrl,
+    artwork: normalizeItunesArtwork(track.artworkUrl100),
+    collectionName: track.collectionName,
+  })
+}
+
+function normalizeDeezerTrack(track, fallbackArtistName = '') {
+  const artistName = track.artist?.name ?? fallbackArtistName
+
+  if (!artistName || !track.title || !track.preview) {
+    return null
+  }
+
+  return createNormalizedTrack({
+    provider: 'deezer',
+    id: String(track.id ?? `${artistName}-${track.title}`),
+    artistName,
+    title: track.title,
+    previewUrl: track.preview,
+    artwork:
+      track.album?.cover_xl ??
+      track.album?.cover_big ??
+      track.album?.cover_medium ??
+      track.album?.cover ??
+      '',
+    collectionName: track.album?.title,
+  })
+}
+
+function mergeArtistResults(artistGroups) {
+  const mergedArtists = new Map()
+
+  artistGroups.flat().forEach((artist) => {
+    if (!artist?.artistName) {
+      return
+    }
+
+    const artistKey = createArtistKey(artist.artistName)
+    const currentArtist = mergedArtists.get(artistKey)
+
+    if (!currentArtist) {
+      mergedArtists.set(artistKey, artist)
+      return
+    }
+
+    mergedArtists.set(artistKey, {
+      ...currentArtist,
+      primaryGenreName:
+        currentArtist.primaryGenreName !== 'Unknown genre'
+          ? currentArtist.primaryGenreName
+          : artist.primaryGenreName,
+      artwork: currentArtist.artwork || artist.artwork,
+      itunesArtistId: currentArtist.itunesArtistId ?? artist.itunesArtistId ?? null,
+      deezerArtistId: currentArtist.deezerArtistId ?? artist.deezerArtistId ?? null,
+    })
+  })
+
+  return Array.from(mergedArtists.values())
+}
+
+function mergeTrackResults(trackGroups) {
+  const mergedTracks = new Map()
+
+  trackGroups.flat().forEach((track) => {
+    if (!track?.previewUrl || !track.songKey) {
+      return
+    }
+
+    if (!mergedTracks.has(track.songKey)) {
+      mergedTracks.set(track.songKey, track)
+    }
+  })
+
+  return Array.from(mergedTracks.values())
+}
+
 async function fetchItunes(endpoint, params, signal) {
   const response = await fetch(`/api/itunes/${endpoint}?${params.toString()}`, signal ? { signal } : undefined)
 
@@ -1154,6 +1343,43 @@ async function fetchItunes(endpoint, params, signal) {
   }
 
   return response.json()
+}
+
+async function fetchDeezer(path, params, signal) {
+  const response = await fetch(`/api/deezer/${path}?${params.toString()}`, signal ? { signal } : undefined)
+
+  if (!response.ok) {
+    throw new Error(`Deezer ${path} request failed.`)
+  }
+
+  return response.json()
+}
+
+async function settleProviderResults(requests) {
+  const results = await Promise.allSettled(requests)
+  const fulfilledValues = results
+    .filter((result) => result.status === 'fulfilled')
+    .map((result) => result.value)
+
+  if (fulfilledValues.length > 0) {
+    return fulfilledValues
+  }
+
+  const abortError = results.find(
+    (result) => result.status === 'rejected' && result.reason?.name === 'AbortError',
+  )
+
+  if (abortError?.status === 'rejected') {
+    throw abortError.reason
+  }
+
+  const rejection = results.find((result) => result.status === 'rejected')
+
+  if (rejection?.status === 'rejected') {
+    throw rejection.reason
+  }
+
+  return []
 }
 
 function buildLeaderboardSources(manualArtists, selectedPlaylists) {
@@ -1234,7 +1460,7 @@ function createRounds(tracks, roundCount) {
   })
 }
 
-async function searchArtists(query, signal) {
+async function searchItunesArtists(query, signal) {
   const params = new URLSearchParams({
     term: query,
     entity: 'song',
@@ -1243,107 +1469,129 @@ async function searchArtists(query, signal) {
   })
 
   const data = await fetchItunes('search', params, signal)
-  const seenArtists = new Set()
-
   return (data.results ?? [])
     .filter((item) => item.artistId && item.artistName)
-    .filter((item) => {
-      if (seenArtists.has(item.artistId)) {
-        return false
-      }
-
-      seenArtists.add(item.artistId)
-      return true
-    })
-    .slice(0, SEARCH_RESULT_LIMIT)
-    .map((item) => ({
-      artistId: item.artistId,
-      artistName: item.artistName,
-      primaryGenreName: item.primaryGenreName ?? 'Unknown genre',
-      artwork:
-        item.artworkUrl100?.replace('100x100bb', '300x300bb') ?? item.artworkUrl100 ?? '',
-    }))
+    .map(normalizeItunesArtist)
+    .filter(Boolean)
 }
 
-async function fetchSongsForArtist(artist) {
+async function searchDeezerArtists(query, signal) {
   const params = new URLSearchParams({
-    id: String(artist.artistId),
+    q: query,
+    limit: String(SEARCH_RESULT_LIMIT * 4),
+  })
+
+  const data = await fetchDeezer('search/artist', params, signal)
+  return (data.data ?? []).map(normalizeDeezerArtist).filter(Boolean)
+}
+
+async function searchArtists(query, signal) {
+  const artistGroups = await settleProviderResults([
+    searchItunesArtists(query, signal),
+    searchDeezerArtists(query, signal),
+  ])
+
+  return mergeArtistResults(artistGroups).slice(0, SEARCH_RESULT_LIMIT)
+}
+
+async function fetchItunesSongsForArtist(artist) {
+  let itunesArtistId = artist.itunesArtistId
+
+  if (!itunesArtistId) {
+    const matches = await searchItunesArtists(artist.artistName)
+    const matchingArtist =
+      matches.find((match) => normalizeText(match.artistName) === normalizeText(artist.artistName)) ??
+      matches[0]
+
+    itunesArtistId = matchingArtist?.itunesArtistId ?? null
+  }
+
+  if (!itunesArtistId) {
+    return []
+  }
+
+  const params = new URLSearchParams({
+    id: itunesArtistId,
     entity: 'song',
     limit: String(SONG_FETCH_LIMIT),
   })
 
   const data = await fetchItunes('lookup', params)
-  const seenTracks = new Set()
-
   return (data.results ?? [])
     .filter((item) => item.wrapperType === 'track' && item.kind === 'song')
-    .filter((item) => item.previewUrl && item.trackName)
-    .filter((item) => {
-      const key = createSongKey(item.artistName ?? artist.artistName, item.trackName)
-
-      if (seenTracks.has(key)) {
-        return false
-      }
-
-      seenTracks.add(key)
-      return true
-    })
-    .map((track) => ({
-      id: String(track.trackId ?? `${track.artistId}-${track.trackName}`),
-      songKey: createSongKey(track.artistName ?? artist.artistName, track.trackName),
-      titleKey: normalizeTrackTitle(track.trackName),
-      title: track.trackName,
-      artistName: track.artistName ?? artist.artistName,
-      previewUrl: track.previewUrl,
-      artwork:
-        track.artworkUrl100?.replace('100x100bb', '300x300bb') ?? track.artworkUrl100 ?? '',
-      collectionName: track.collectionName ?? 'Single',
-    }))
+    .map((track) => normalizeItunesTrack(track, artist.artistName))
+    .filter(Boolean)
 }
 
-async function searchTracksByQuery(query) {
+async function fetchDeezerSongsForArtist(artist) {
+  let deezerArtistId = artist.deezerArtistId
+
+  if (!deezerArtistId) {
+    const matches = await searchDeezerArtists(artist.artistName)
+    const matchingArtist =
+      matches.find((match) => normalizeText(match.artistName) === normalizeText(artist.artistName)) ??
+      matches[0]
+
+    deezerArtistId = matchingArtist?.deezerArtistId ?? null
+  }
+
+  if (!deezerArtistId) {
+    return []
+  }
+
+  const params = new URLSearchParams({
+    limit: String(DEEZER_SONG_FETCH_LIMIT),
+  })
+  const data = await fetchDeezer(`artist/${deezerArtistId}/top`, params)
+
+  return (data.data ?? []).map((track) => normalizeDeezerTrack(track, artist.artistName)).filter(Boolean)
+}
+
+async function fetchSongsForArtist(artist) {
+  const trackGroups = await settleProviderResults([
+    fetchItunesSongsForArtist(artist),
+    fetchDeezerSongsForArtist(artist),
+  ])
+
+  return mergeTrackResults(trackGroups)
+}
+
+async function searchItunesTracksByQuery(query) {
   const params = new URLSearchParams({
     term: query,
     entity: 'song',
     limit: '10',
   })
   const data = await fetchItunes('search', params)
-  const candidates = (data.results ?? [])
+
+  return (data.results ?? [])
     .filter((item) => item.wrapperType === 'track' && item.kind === 'song')
-    .filter((item) => item.previewUrl && item.trackName)
-    .filter((item) => !shouldRejectTrackVersion(item))
-    .map((track) => ({
-      id: String(track.trackId ?? `${track.artistId}-${track.trackName}`),
-      songKey: createSongKey(track.artistName, track.trackName),
-      titleKey: normalizeTrackTitle(track.trackName),
-      title: track.trackName,
-      artistName: track.artistName,
-      previewUrl: track.previewUrl,
-      artwork:
-        track.artworkUrl100?.replace('100x100bb', '300x300bb') ?? track.artworkUrl100 ?? '',
-      collectionName: track.collectionName ?? 'Single',
-    }))
+    .map((track) => normalizeItunesTrack(track))
+    .filter(Boolean)
+}
+
+async function searchDeezerTracksByQuery(query) {
+  const params = new URLSearchParams({
+    q: query,
+    limit: '10',
+  })
+  const data = await fetchDeezer('search/track', params)
+
+  return (data.data ?? []).map((track) => normalizeDeezerTrack(track)).filter(Boolean)
+}
+
+async function searchTracksByQuery(query) {
+  const trackGroups = await settleProviderResults([
+    searchItunesTracksByQuery(query),
+    searchDeezerTracksByQuery(query),
+  ])
+  const candidates = mergeTrackResults(trackGroups).filter((track) => !shouldRejectTrackVersion(track))
 
   if (candidates.length > 0) {
     return [candidates[0]]
   }
 
-  const fallback = (data.results ?? [])
-    .filter((item) => item.wrapperType === 'track' && item.kind === 'song')
-    .filter((item) => item.previewUrl && item.trackName)
-    .map((track) => ({
-      id: String(track.trackId ?? `${track.artistId}-${track.trackName}`),
-      songKey: createSongKey(track.artistName, track.trackName),
-      titleKey: normalizeTrackTitle(track.trackName),
-      title: track.trackName,
-      artistName: track.artistName,
-      previewUrl: track.previewUrl,
-      artwork:
-        track.artworkUrl100?.replace('100x100bb', '300x300bb') ?? track.artworkUrl100 ?? '',
-      collectionName: track.collectionName ?? 'Single',
-    }))
-
-  return fallback.length > 0 ? [fallback[0]] : []
+  return []
 }
 
 async function resolveSelectedPlaylistArtists(playlists, roundCount) {
@@ -1396,15 +1644,17 @@ async function resolveTrackPlaylistTracks(playlists, roundCount) {
   )
   const trackGroups = await Promise.all(sampledQueries.map(searchTracksByQuery))
   const seenTracks = new Set()
+  const seenTitles = new Set()
 
   return trackGroups
     .flat()
     .filter((track) => {
-      if (seenTracks.has(track.songKey)) {
+      if (seenTracks.has(track.songKey) || seenTitles.has(track.titleKey)) {
         return false
       }
 
       seenTracks.add(track.songKey)
+      seenTitles.add(track.titleKey)
       return true
     })
 }
