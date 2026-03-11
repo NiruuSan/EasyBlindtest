@@ -1,8 +1,43 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import './App.css'
-import { fetchLeaderboard, submitLeaderboardEntries } from './lib/leaderboards'
-import { isSupabaseConfigured } from './lib/supabase'
+import { fetchGlobalLeaderboard, fetchLeaderboard, submitLeaderboardEntries } from './lib/leaderboards'
+import { isSupabaseConfigured, supabase } from './lib/supabase'
+import {
+  createMultiplayerLobby,
+  createOneVOneMatch,
+  ensureProfile,
+  fetchLobbyByCode,
+  fetchLobbyPlayers,
+  fetchMultiplayerScoreboard,
+  fetchPreset,
+  fetchProfile,
+  fetchPublicLobbies,
+  fetchPublicOneVOneMatches,
+  fetchSession,
+  fetchTrendingBlindtests,
+  fetchUserOneVOneMatches,
+  finishMultiplayerLobby,
+  joinMultiplayerLobby,
+  joinOneVOneMatch,
+  recordPlayActivities,
+  signInWithEmail,
+  signOutUser,
+  signUpWithEmail,
+  startMultiplayerLobby,
+  submitMultiplayerAnswer,
+  submitOneVOneResult,
+  subscribeToLobby,
+  updateProfile,
+} from './lib/competitive'
+import HomePage from './pages/HomePage'
+import ArtistModePage from './pages/ArtistModePage'
+import PlaylistModePage from './pages/PlaylistModePage'
+import OneVOnePage from './pages/OneVOnePage'
+import MultiplayerPage from './pages/MultiplayerPage'
+import LeaderboardPage from './pages/LeaderboardPage'
+import AccountPage from './pages/AccountPage'
+import CompetitiveGamePage from './pages/GamePage'
 
 const ROUND_OPTIONS = [5, 10, 15, 20]
 const ROUND_DURATION_MS = 30000
@@ -1493,7 +1528,20 @@ function normalizeDeezerTrack(track, fallbackArtistName = '') {
   })
 }
 
-function mergeArtistResults(artistGroups) {
+function scoreArtistRelevance(artistName, query) {
+  if (!artistName || !query) return 0
+  const n = normalizeText(artistName)
+  const q = normalizeText(query)
+  if (!n || !q) return 0
+  if (n === q) return 100
+  if (n.startsWith(q)) return 80
+  if (n.includes(q)) return 60
+  const qWords = q.split(/\s+/).filter(Boolean)
+  const matchCount = qWords.filter((w) => n.includes(w)).length
+  return matchCount > 0 ? 20 + matchCount * 10 : 0
+}
+
+function mergeArtistResults(artistGroups, query) {
   const mergedArtists = new Map()
 
   artistGroups.flat().forEach((artist) => {
@@ -1521,7 +1569,14 @@ function mergeArtistResults(artistGroups) {
     })
   })
 
-  return Array.from(mergedArtists.values())
+  const list = Array.from(mergedArtists.values())
+  if (!query?.trim()) return list
+
+  return list.sort((a, b) => {
+    const scoreA = scoreArtistRelevance(a.artistName, query)
+    const scoreB = scoreArtistRelevance(b.artistName, query)
+    return scoreB - scoreA
+  })
 }
 
 function mergeTrackResults(trackGroups) {
@@ -1722,7 +1777,7 @@ async function searchArtists(query, signal) {
     searchDeezerArtists(query, signal),
   ])
 
-  return mergeArtistResults(artistGroups).slice(0, SEARCH_RESULT_LIMIT)
+  return mergeArtistResults(artistGroups, query).slice(0, SEARCH_RESULT_LIMIT)
 }
 
 async function fetchItunesSongsForArtist(artist) {
@@ -2500,6 +2555,7 @@ function GamePage({
 
 function App() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searchState, setSearchState] = useState('idle')
@@ -2525,12 +2581,35 @@ function App() {
   const [playerName, setPlayerName] = useState('')
   const [submissionState, setSubmissionState] = useState('idle')
   const [submissionError, setSubmissionError] = useState('')
+  const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [authMode, setAuthMode] = useState('signin')
+  const [authEmail, setAuthEmail] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authDisplayName, setAuthDisplayName] = useState('')
+  const [authState, setAuthState] = useState('idle')
+  const [authError, setAuthError] = useState('')
+  const [authNotice, setAuthNotice] = useState('')
+  const [trendingBlindtests, setTrendingBlindtests] = useState([])
+  const [globalLeaderboard, setGlobalLeaderboard] = useState([])
+  const [publicMatches, setPublicMatches] = useState([])
+  const [myMatches, setMyMatches] = useState([])
+  const [oneVOneTab, setOneVOneTab] = useState('unranked')
+  const [oneVOneVisibility, setOneVOneVisibility] = useState('public')
+  const [matchJoinCode, setMatchJoinCode] = useState('')
+  const [publicLobbies, setPublicLobbies] = useState([])
+  const [lobbyJoinCode, setLobbyJoinCode] = useState('')
+  const [currentLobby, setCurrentLobby] = useState(null)
+  const [lobbyPlayers, setLobbyPlayers] = useState([])
+  const [liveScoreboard, setLiveScoreboard] = useState([])
 
   const searchAbortRef = useRef(null)
   const audioRef = useRef(null)
   const roundStartTimeRef = useRef(0)
   const playbackStartTimeRef = useRef(0)
   const submitAnswerRef = useRef(() => {})
+  const lobbyChannelRef = useRef(null)
+  const persistedRunIdsRef = useRef(new Set())
 
   const currentRound = rounds[roundIndex] ?? null
   const canSearch = searchTerm.trim().length >= 2
@@ -2559,6 +2638,196 @@ function App() {
     const correctAnswers = history.filter((item) => item.isCorrect).length
     return Math.round((correctAnswers / history.length) * 100)
   }, [history])
+  const currentUserId = session?.user?.id ?? null
+  const currentDisplayName = profile?.display_name ?? session?.user?.user_metadata?.display_name ?? 'Player'
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) {
+      return undefined
+    }
+
+    let isCancelled = false
+
+    async function syncSession() {
+      try {
+        const nextSession = await fetchSession()
+
+        if (isCancelled) {
+          return
+        }
+
+        setSession(nextSession)
+
+        if (nextSession?.user) {
+          const nextProfile = await ensureProfile(nextSession.user)
+
+          if (!isCancelled) {
+            setProfile(nextProfile)
+            setAuthDisplayName(nextProfile.display_name ?? '')
+          }
+        } else {
+          setProfile(null)
+        }
+      } catch {
+        if (!isCancelled) {
+          setSession(null)
+          setProfile(null)
+        }
+      }
+    }
+
+    syncSession()
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
+      setSession(nextSession)
+
+      if (nextSession?.user) {
+        const nextProfile = await ensureProfile(nextSession.user)
+        setProfile(nextProfile)
+        setAuthDisplayName(nextProfile.display_name ?? '')
+      } else {
+        setProfile(null)
+      }
+    })
+
+    return () => {
+      isCancelled = true
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      return undefined
+    }
+
+    let isCancelled = false
+
+    async function loadDiscoveryData() {
+      try {
+        const [nextTrending, nextGlobal, nextPublicMatches, nextPublicLobbies] = await Promise.all([
+          fetchTrendingBlindtests(8),
+          fetchGlobalLeaderboard(8),
+          currentUserId ? fetchPublicOneVOneMatches(oneVOneTab) : Promise.resolve([]),
+          currentUserId ? fetchPublicLobbies() : Promise.resolve([]),
+        ])
+
+        if (!isCancelled) {
+          setTrendingBlindtests(nextTrending)
+          setGlobalLeaderboard(nextGlobal)
+          setPublicMatches(nextPublicMatches)
+          setPublicLobbies(nextPublicLobbies)
+        }
+      } catch {
+        if (!isCancelled) {
+          setTrendingBlindtests([])
+          setGlobalLeaderboard([])
+          setPublicMatches([])
+          setPublicLobbies([])
+        }
+      }
+    }
+
+    loadDiscoveryData()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [currentUserId, oneVOneTab])
+
+  useEffect(() => {
+    if (!currentUserId || !isSupabaseConfigured) {
+      setMyMatches([])
+      return undefined
+    }
+
+    let isCancelled = false
+
+    async function loadUserMatches() {
+      try {
+        const matches = await fetchUserOneVOneMatches(currentUserId)
+
+        if (!isCancelled) {
+          setMyMatches(matches)
+        }
+      } catch {
+        if (!isCancelled) {
+          setMyMatches([])
+        }
+      }
+    }
+
+    loadUserMatches()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [currentUserId])
+
+  useEffect(() => {
+    if (!currentLobby || !isSupabaseConfigured) {
+      lobbyChannelRef.current?.unsubscribe?.()
+      lobbyChannelRef.current = null
+      return undefined
+    }
+
+    let isCancelled = false
+
+    async function refreshLobbyState() {
+      try {
+        const [{ data: latestLobby, error: latestLobbyError }, players, scoreboard] = await Promise.all([
+          supabase.from('multiplayer_lobbies').select('*').eq('id', currentLobby.id).single(),
+          fetchLobbyPlayers(currentLobby.id),
+          fetchMultiplayerScoreboard(currentLobby.id),
+        ])
+
+        if (latestLobbyError) {
+          throw latestLobbyError
+        }
+
+        if (!isCancelled) {
+          setCurrentLobby(latestLobby)
+          setLobbyPlayers(players)
+          setLiveScoreboard(scoreboard)
+
+          if (latestLobby.status === 'live' && location.pathname !== '/game' && latestLobby.preset_id) {
+            const preset = await fetchPreset(latestLobby.preset_id)
+            setRounds(preset.rounds)
+            setRoundIndex(0)
+            setScore(0)
+            setHistory([])
+            setRoundResult(null)
+            setTimeLeftMs(ROUND_DURATION_MS)
+            setGameContext({
+              leaderboardSources: [],
+              mode: 'multiplayer',
+              lobby: latestLobby,
+              roundCount: latestLobby.round_count,
+            })
+            setGameState('playing')
+            navigate('/game')
+          }
+        }
+      } catch {
+        if (!isCancelled) {
+          setLobbyPlayers([])
+          setLiveScoreboard([])
+        }
+      }
+    }
+
+    refreshLobbyState()
+    lobbyChannelRef.current?.unsubscribe?.()
+    lobbyChannelRef.current = subscribeToLobby(currentLobby.id, refreshLobbyState)
+
+    return () => {
+      isCancelled = true
+      lobbyChannelRef.current?.unsubscribe?.()
+      lobbyChannelRef.current = null
+    }
+  }, [currentLobby, location.pathname, navigate])
 
   useEffect(() => {
     if (gameState !== 'finished' || !gameContext || !isSupabaseConfigured) {
@@ -2596,6 +2865,103 @@ function App() {
       isCancelled = true
     }
   }, [gameContext, gameState])
+
+  useEffect(() => {
+    if (gameState !== 'finished' || !gameContext || history.length === 0 || !isSupabaseConfigured) {
+      return
+    }
+
+    const runKey = `${gameContext.mode ?? 'solo'}:${gameContext.match?.id ?? gameContext.lobby?.id ?? 'solo'}:${history.length}:${score}`
+
+    if (persistedRunIdsRef.current.has(runKey)) {
+      return
+    }
+
+    persistedRunIdsRef.current.add(runKey)
+
+    const correctAnswers = history.filter((item) => item.isCorrect).length
+
+    async function persistRun() {
+      try {
+        const activitySources =
+          gameContext.mode === 'one_v_one' && gameContext.match
+            ? [
+                {
+                  type: gameContext.match.source_type,
+                  id:
+                    gameContext.match.source_id?.replace(
+                      `${gameContext.match.source_type}:`,
+                      '',
+                    ) ?? gameContext.match.id,
+                  name: gameContext.match.source_name,
+                },
+              ]
+            : gameContext.leaderboardSources ?? []
+
+        if (activitySources.length) {
+          await recordPlayActivities({
+            userId: currentUserId,
+            mode: gameContext.mode ?? 'solo',
+            sources: activitySources,
+            roundCount: gameContext.roundCount,
+            score,
+            accuracy: finalAccuracy,
+            correctAnswers,
+            totalRounds: history.length,
+          })
+        }
+
+        if (gameContext.mode === 'one_v_one' && currentUserId) {
+          await submitOneVOneResult({
+            matchId: gameContext.match.id,
+            userId: currentUserId,
+            displayName: currentDisplayName,
+            score,
+            accuracy: finalAccuracy,
+            correctAnswers,
+            totalRounds: history.length,
+          })
+
+          const nextMatches = await fetchUserOneVOneMatches(currentUserId)
+          setMyMatches(nextMatches)
+        }
+
+        if (gameContext.mode === 'multiplayer' && gameContext.lobby && currentUserId) {
+          await recordPlayActivities({
+            userId: currentUserId,
+            mode: 'multiplayer',
+            sources: [
+              {
+                type: gameContext.lobby.source_type,
+                id: gameContext.lobby.source_id?.replace(`${gameContext.lobby.source_type}:`, '') ?? gameContext.lobby.id,
+                name: gameContext.lobby.source_name,
+              },
+            ],
+            roundCount: gameContext.roundCount,
+            score,
+            accuracy: finalAccuracy,
+            correctAnswers,
+            totalRounds: history.length,
+          })
+
+          const scoreboard = await fetchMultiplayerScoreboard(gameContext.lobby.id)
+          setLiveScoreboard(scoreboard)
+
+          if (
+            currentUserId === gameContext.lobby.host_id &&
+            scoreboard.length > 0 &&
+            scoreboard.every((entry) => entry.answersCount >= gameContext.roundCount)
+          ) {
+            await finishMultiplayerLobby(gameContext.lobby.id)
+          }
+        }
+      } catch {
+        persistedRunIdsRef.current.delete(runKey)
+      }
+    }
+
+    persistRun()
+  }, [currentDisplayName, currentUserId, finalAccuracy, gameContext, gameState, history, score])
 
   useEffect(() => {
     if (!canSearch) {
@@ -2743,6 +3109,21 @@ function App() {
     submitAnswerRef.current = submitAnswer
   }, [submitAnswer])
 
+  useEffect(() => {
+    if (!roundResult || gameContext?.mode !== 'multiplayer' || !gameContext.lobby || !currentUserId) {
+      return
+    }
+
+    submitMultiplayerAnswer({
+      lobbyId: gameContext.lobby.id,
+      userId: currentUserId,
+      roundNumber: roundResult.roundNumber,
+      selectedTrackId: roundResult.selectedOption?.id ?? null,
+      isCorrect: roundResult.isCorrect,
+      earnedPoints: roundResult.earnedPoints,
+    }).catch(() => {})
+  }, [currentUserId, gameContext, roundResult])
+
   function addArtist(artist) {
     setManualArtists((currentArtists) => mergeUniqueArtists(currentArtists, [artist]))
     setSearchTerm('')
@@ -2790,6 +3171,59 @@ function App() {
     setPlaylistError('')
   }
 
+  function getPrimarySelectedSource() {
+    if (manualArtists.length + selectedPlaylists.length !== 1) {
+      throw new Error('Competitive modes require exactly one artist or one playlist.')
+    }
+
+    if (manualArtists.length === 1) {
+      const artist = manualArtists[0]
+
+      return {
+        type: 'artist',
+        id: String(artist.artistId),
+        name: artist.artistName,
+        coverUrl: artist.artwork,
+        metadata: {
+          primaryGenreName: artist.primaryGenreName,
+        },
+      }
+    }
+
+    const playlist = selectedPlaylists[0]
+
+    return {
+      type: 'playlist',
+      id: playlist.id,
+      name: playlist.title,
+      coverUrl: '',
+      metadata: {
+        category: playlist.category,
+        type: getPlaylistType(playlist),
+      },
+    }
+  }
+
+  async function buildBlindtestSnapshot({ requireSingleSource = false } = {}) {
+    const playlistArtists = await resolveSelectedPlaylistArtists(selectedPlaylists, roundCount)
+    const curatedTracks = await resolveTrackPlaylistTracks(selectedPlaylists, roundCount)
+    const effectiveSelectedArtists = mergeUniqueArtists(manualArtists, playlistArtists)
+
+    if (effectiveSelectedArtists.length === 0 && curatedTracks.length === 0) {
+      throw new Error('Could not load enough songs from the selected artists or playlists.')
+    }
+
+    const trackGroups = await Promise.all(effectiveSelectedArtists.map(fetchSongsForArtist))
+    const tracks = shuffle([...curatedTracks, ...trackGroups.flat()])
+    const nextRounds = createRounds(tracks, roundCount)
+
+    return {
+      rounds: nextRounds,
+      sources: buildLeaderboardSources(manualArtists, selectedPlaylists),
+      source: requireSingleSource ? getPrimarySelectedSource() : null,
+    }
+  }
+
   async function startGame() {
     if (manualArtists.length === 0 && selectedPlaylists.length === 0) {
       setGameError('Select at least one artist or playlist before starting.')
@@ -2812,24 +3246,15 @@ function App() {
     setSubmissionError('')
 
     try {
-      const playlistArtists = await resolveSelectedPlaylistArtists(selectedPlaylists, roundCount)
-      const curatedTracks = await resolveTrackPlaylistTracks(selectedPlaylists, roundCount)
-      const effectiveSelectedArtists = mergeUniqueArtists(manualArtists, playlistArtists)
-
-      if (effectiveSelectedArtists.length === 0 && curatedTracks.length === 0) {
-        throw new Error('Could not load enough songs from the selected artists or playlists.')
-      }
-
-      const trackGroups = await Promise.all(effectiveSelectedArtists.map(fetchSongsForArtist))
-      const tracks = shuffle([...curatedTracks, ...trackGroups.flat()])
-      const nextRounds = createRounds(tracks, roundCount)
+      const snapshot = await buildBlindtestSnapshot()
       setGameContext({
-        leaderboardSources: buildLeaderboardSources(manualArtists, selectedPlaylists),
+        leaderboardSources: snapshot.sources,
         manualArtists,
+        mode: 'solo',
         roundCount,
         selectedPlaylists,
       })
-      setRounds(nextRounds)
+      setRounds(snapshot.rounds)
       setTimeLeftMs(ROUND_DURATION_MS)
       setAudioBlocked(false)
       setAudioReady(false)
@@ -2838,6 +3263,299 @@ function App() {
     } catch (error) {
       setGameState('setup')
       setGameError(error.message || 'Could not start the blindtest.')
+    }
+  }
+
+  async function handleAuthSubmit() {
+    if (!isSupabaseConfigured) {
+      setAuthError('Supabase is not configured.')
+      return
+    }
+
+    setAuthState('loading')
+    setAuthError('')
+    setAuthNotice('')
+
+    try {
+      if (authMode === 'signin') {
+        const { user } = await signInWithEmail({
+          email: authEmail.trim(),
+          password: authPassword,
+        })
+
+        const nextProfile = await fetchProfile(user.id)
+        setProfile(nextProfile)
+        setAuthNotice('Signed in successfully.')
+      } else {
+        const { user, session: signUpSession } = await signUpWithEmail({
+          email: authEmail.trim(),
+          password: authPassword,
+          displayName: authDisplayName.trim(),
+        })
+
+        if (signUpSession?.user) {
+          const nextProfile = await fetchProfile(user.id)
+          setProfile(nextProfile)
+          setAuthNotice('Account created successfully.')
+        } else {
+          setAuthNotice('Account created. Check your email to confirm your account, then sign in.')
+        }
+      }
+
+      setAuthState('success')
+      setAuthPassword('')
+      if (authMode === 'signin') {
+        navigate('/account')
+      }
+    } catch (error) {
+      setAuthState('error')
+      setAuthError(error.message || 'Could not authenticate.')
+    }
+  }
+
+  async function handleSaveProfileName() {
+    if (!currentUserId) {
+      return
+    }
+
+    try {
+      const nextProfile = await updateProfile(currentUserId, {
+        display_name: authDisplayName.trim() || currentDisplayName,
+      })
+      setProfile(nextProfile)
+      setAuthNotice('Profile updated successfully.')
+      setAuthError('')
+    } catch (error) {
+      setAuthError(error.message || 'Could not save your profile.')
+    }
+  }
+
+  async function handleCreateOneVOneMatch() {
+    if (!currentUserId) {
+      setGameError('Sign in to create a 1v1 match.')
+      navigate('/account')
+      return
+    }
+
+    if (manualArtists.length === 0 && selectedPlaylists.length === 0) {
+      setGameError('Select exactly one artist or playlist before creating a 1v1 match.')
+      return
+    }
+
+    setGameState('loading')
+    setGameError('')
+
+    try {
+      const snapshot = await buildBlindtestSnapshot({ requireSingleSource: true })
+      const match = await createOneVOneMatch({
+        createdBy: currentUserId,
+        visibility: oneVOneTab === 'ranked' ? 'public' : oneVOneVisibility,
+        matchType: oneVOneTab,
+        source: snapshot.source,
+        roundCount,
+        rounds: snapshot.rounds,
+      })
+
+      setRounds(snapshot.rounds)
+      setRoundIndex(0)
+      setScore(0)
+      setHistory([])
+      setRoundResult(null)
+      setTimeLeftMs(ROUND_DURATION_MS)
+      setGameContext({
+        leaderboardSources: snapshot.sources,
+        mode: 'one_v_one',
+        match,
+        roundCount,
+      })
+      setGameState('playing')
+      navigate('/game')
+    } catch (error) {
+      setGameState('setup')
+      setGameError(error.message || 'Could not create the 1v1 match.')
+    }
+  }
+
+  async function handleJoinPrivateMatch() {
+    if (!currentUserId) {
+      navigate('/account')
+      return
+    }
+
+    try {
+      const match = await fetchOneVOneMatchByCode(matchJoinCode.trim())
+
+      if (!match) {
+        throw new Error('No match was found for that code.')
+      }
+
+      const claimedMatch =
+        match.opponent_id || match.created_by === currentUserId
+          ? match
+          : await joinOneVOneMatch(match.id, currentUserId)
+      const preset = await fetchPreset(claimedMatch.preset_id)
+
+      setRounds(preset.rounds)
+      setRoundIndex(0)
+      setScore(0)
+      setHistory([])
+      setRoundResult(null)
+      setTimeLeftMs(ROUND_DURATION_MS)
+      setGameContext({
+        leaderboardSources: [],
+        mode: 'one_v_one',
+        match: claimedMatch,
+        roundCount: claimedMatch.round_count,
+      })
+      setGameState('playing')
+      navigate('/game')
+    } catch (error) {
+      setGameError(error.message || 'Could not join the private match.')
+    }
+  }
+
+  async function handleJoinPublicMatch(matchId) {
+    if (!currentUserId) {
+      navigate('/account')
+      return
+    }
+
+    try {
+      const match = publicMatches.find((entry) => entry.id === matchId)
+
+      if (!match) {
+        throw new Error('This public match is no longer available.')
+      }
+
+      const claimedMatch =
+        match.opponent_id || match.created_by === currentUserId
+          ? match
+          : await joinOneVOneMatch(match.id, currentUserId)
+      const preset = await fetchPreset(claimedMatch.preset_id)
+
+      setRounds(preset.rounds)
+      setRoundIndex(0)
+      setScore(0)
+      setHistory([])
+      setRoundResult(null)
+      setTimeLeftMs(ROUND_DURATION_MS)
+      setGameContext({
+        leaderboardSources: [],
+        mode: 'one_v_one',
+        match: claimedMatch,
+        roundCount: claimedMatch.round_count,
+      })
+      setGameState('playing')
+      navigate('/game')
+    } catch (error) {
+      setGameError(error.message || 'Could not join the public match.')
+    }
+  }
+
+  async function handleCreateLobby() {
+    if (!currentUserId) {
+      navigate('/account')
+      return
+    }
+
+    setGameState('loading')
+    setGameError('')
+
+    try {
+      const snapshot = await buildBlindtestSnapshot({ requireSingleSource: true })
+      const lobby = await createMultiplayerLobby({
+        hostId: currentUserId,
+        source: snapshot.source,
+        roundCount,
+        rounds: snapshot.rounds,
+      })
+
+      await joinMultiplayerLobby({
+        lobbyId: lobby.id,
+        userId: currentUserId,
+        displayName: currentDisplayName,
+        isHost: true,
+      })
+
+      setCurrentLobby(lobby)
+      setGameState('setup')
+      navigate('/multiplayer')
+    } catch (error) {
+      setGameState('setup')
+      setGameError(error.message || 'Could not create the multiplayer lobby.')
+    }
+  }
+
+  async function handleJoinLobby() {
+    if (!currentUserId) {
+      navigate('/account')
+      return
+    }
+
+    try {
+      const lobby = await fetchLobbyByCode(lobbyJoinCode.trim())
+
+      if (!lobby) {
+        throw new Error('No lobby was found for that code.')
+      }
+
+      await joinMultiplayerLobby({
+        lobbyId: lobby.id,
+        userId: currentUserId,
+        displayName: currentDisplayName,
+        isHost: lobby.host_id === currentUserId,
+      })
+
+      setCurrentLobby(lobby)
+
+      if (lobby.status === 'live' && lobby.preset_id) {
+        const preset = await fetchPreset(lobby.preset_id)
+        setRounds(preset.rounds)
+        setRoundIndex(0)
+        setScore(0)
+        setHistory([])
+        setRoundResult(null)
+        setTimeLeftMs(ROUND_DURATION_MS)
+        setGameContext({
+          leaderboardSources: [],
+          mode: 'multiplayer',
+          lobby,
+          roundCount: lobby.round_count,
+        })
+        setGameState('playing')
+        navigate('/game')
+      }
+    } catch (error) {
+      setGameError(error.message || 'Could not join the lobby.')
+    }
+  }
+
+  async function handleStartLobby() {
+    if (!currentLobby) {
+      return
+    }
+
+    try {
+      const startedLobby = await startMultiplayerLobby(currentLobby.id)
+      const preset = await fetchPreset(startedLobby.preset_id)
+
+      setCurrentLobby(startedLobby)
+      setRounds(preset.rounds)
+      setRoundIndex(0)
+      setScore(0)
+      setHistory([])
+      setRoundResult(null)
+      setTimeLeftMs(ROUND_DURATION_MS)
+      setGameContext({
+        leaderboardSources: [],
+        mode: 'multiplayer',
+        lobby: startedLobby,
+        roundCount: startedLobby.round_count,
+      })
+      setGameState('playing')
+      navigate('/game')
+    } catch (error) {
+      setGameError(error.message || 'Could not start the lobby.')
     }
   }
 
@@ -2875,14 +3593,26 @@ function App() {
     setTimeLeftMs(ROUND_DURATION_MS)
     setAudioBlocked(false)
     setAudioReady(false)
-    navigate('/')
+    navigate(
+      gameContext?.mode === 'one_v_one'
+        ? '/one-v-one'
+        : gameContext?.mode === 'multiplayer'
+          ? '/multiplayer'
+          : '/artist-mode',
+    )
   }
 
   function goBackToSetup() {
     audioRef.current?.pause()
     setAudioBlocked(false)
     setAudioReady(false)
-    navigate('/')
+    navigate(
+      gameContext?.mode === 'one_v_one'
+        ? '/one-v-one'
+        : gameContext?.mode === 'multiplayer'
+          ? '/multiplayer'
+          : '/artist-mode',
+    )
   }
 
   async function replaySnippet() {
@@ -2941,23 +3671,218 @@ function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <Link to="/" className="brand-link">
+        <NavLink to="/" className="brand-link">
           EasyBlindtest
-        </Link>
+        </NavLink>
 
         <nav className="site-nav">
-          <Link to="/" className="nav-link">
-            Setup
-          </Link>
-          <Link to="/game" className="nav-link">
-            Game
-          </Link>
+          <NavLink to="/" className="nav-link">
+            Home
+          </NavLink>
+          <NavLink to="/artist-mode" className="nav-link">
+            Artist Mode
+          </NavLink>
+          <NavLink to="/playlist-mode" className="nav-link">
+            Playlist Mode
+          </NavLink>
+          <NavLink to="/one-v-one" className="nav-link">
+            1v1
+          </NavLink>
+          <NavLink to="/multiplayer" className="nav-link">
+            Multiplayer
+          </NavLink>
+          <NavLink to="/leaderboard" className="nav-link">
+            Leaderboard
+          </NavLink>
+          <NavLink to="/account" className="nav-link">
+            {session ? currentDisplayName : 'Account'}
+          </NavLink>
         </nav>
       </header>
 
       <Routes>
         <Route
           path="/"
+          element={
+            <HomePage
+              trendingBlindtests={trendingBlindtests}
+              publicMatches={publicMatches}
+              publicLobbies={publicLobbies}
+            />
+          }
+        />
+        <Route
+          path="/artist-mode"
+          element={
+            <ArtistModePage
+              addArtist={addArtist}
+              applyPlaylist={applyPlaylist}
+              gameError={gameError}
+              gameState={gameState}
+              manualArtists={manualArtists}
+              playlistError={playlistError}
+              playlists={PREMADE_PLAYLISTS}
+              removePlaylist={removePlaylist}
+              removeArtist={removeArtist}
+              roundCount={roundCount}
+              searchError={searchError}
+              searchResults={searchResults}
+              searchState={searchState}
+              searchTerm={searchTerm}
+              selectedPlaylists={selectedPlaylists}
+              setRoundCount={setRoundCount}
+              setSearchError={setSearchError}
+              setSearchResults={setSearchResults}
+              setSearchState={setSearchState}
+              setSearchTerm={setSearchTerm}
+              clearSelectedArtists={clearSelectedArtists}
+              onSubmit={startGame}
+              submitDisabled={false}
+            />
+          }
+        />
+        <Route
+          path="/playlist-mode"
+          element={
+            <PlaylistModePage
+              addArtist={addArtist}
+              applyPlaylist={applyPlaylist}
+              gameError={gameError}
+              gameState={gameState}
+              manualArtists={manualArtists}
+              playlistError={playlistError}
+              playlists={PREMADE_PLAYLISTS}
+              removePlaylist={removePlaylist}
+              removeArtist={removeArtist}
+              roundCount={roundCount}
+              searchError={searchError}
+              searchResults={searchResults}
+              searchState={searchState}
+              searchTerm={searchTerm}
+              selectedPlaylists={selectedPlaylists}
+              setRoundCount={setRoundCount}
+              setSearchError={setSearchError}
+              setSearchResults={setSearchResults}
+              setSearchState={setSearchState}
+              setSearchTerm={setSearchTerm}
+              clearSelectedArtists={clearSelectedArtists}
+              onSubmit={startGame}
+              submitDisabled={false}
+            />
+          }
+        />
+        <Route
+          path="/one-v-one"
+          element={
+            <OneVOnePage
+              activeTab={oneVOneTab}
+              addArtist={addArtist}
+              applyPlaylist={applyPlaylist}
+              clearSelectedArtists={clearSelectedArtists}
+              gameError={gameError}
+              gameState={gameState}
+              joinCode={matchJoinCode}
+              manualArtists={manualArtists}
+              myMatches={myMatches}
+              onJoinPublicMatch={handleJoinPublicMatch}
+              onJoinPrivateMatch={handleJoinPrivateMatch}
+              onSubmit={handleCreateOneVOneMatch}
+              playlistError={playlistError}
+              playlists={PREMADE_PLAYLISTS}
+              publicMatches={publicMatches}
+              removePlaylist={removePlaylist}
+              removeArtist={removeArtist}
+              roundCount={roundCount}
+              searchError={searchError}
+              searchResults={searchResults}
+              searchState={searchState}
+              searchTerm={searchTerm}
+              selectedPlaylists={selectedPlaylists}
+              setActiveTab={setOneVOneTab}
+              setJoinCode={setMatchJoinCode}
+              setRoundCount={setRoundCount}
+              setSearchError={setSearchError}
+              setSearchResults={setSearchResults}
+              setSearchState={setSearchState}
+              setSearchTerm={setSearchTerm}
+              setVisibility={setOneVOneVisibility}
+              submitDisabled={!session}
+              visibility={oneVOneVisibility}
+            />
+          }
+        />
+        <Route
+          path="/multiplayer"
+          element={
+            <MultiplayerPage
+              addArtist={addArtist}
+              applyPlaylist={applyPlaylist}
+              clearSelectedArtists={clearSelectedArtists}
+              currentLobby={currentLobby}
+              gameError={gameError}
+              gameState={gameState}
+              joinCode={lobbyJoinCode}
+              liveScoreboard={liveScoreboard}
+              lobbyPlayers={lobbyPlayers}
+              manualArtists={manualArtists}
+              onJoinLobby={handleJoinLobby}
+              onStartLobby={handleStartLobby}
+              onSubmit={handleCreateLobby}
+              playlistError={playlistError}
+              playlists={PREMADE_PLAYLISTS}
+              publicLobbies={publicLobbies}
+              removePlaylist={removePlaylist}
+              removeArtist={removeArtist}
+              roundCount={roundCount}
+              searchError={searchError}
+              searchResults={searchResults}
+              searchState={searchState}
+              searchTerm={searchTerm}
+              selectedPlaylists={selectedPlaylists}
+              setJoinCode={setLobbyJoinCode}
+              setRoundCount={setRoundCount}
+              setSearchError={setSearchError}
+              setSearchResults={setSearchResults}
+              setSearchState={setSearchState}
+              setSearchTerm={setSearchTerm}
+              submitDisabled={!session}
+            />
+          }
+        />
+        <Route
+          path="/leaderboard"
+          element={
+            <LeaderboardPage
+              globalLeaderboard={globalLeaderboard}
+              trendingBlindtests={trendingBlindtests}
+            />
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <AccountPage
+              authDisplayName={authDisplayName}
+              authEmail={authEmail}
+              authError={authError}
+              authNotice={authNotice}
+              authMode={authMode}
+              authPassword={authPassword}
+              authState={authState}
+              onSaveDisplayName={handleSaveProfileName}
+              onSignOut={signOutUser}
+              onSubmitAuth={handleAuthSubmit}
+              profile={profile}
+              session={session}
+              setAuthDisplayName={setAuthDisplayName}
+              setAuthEmail={setAuthEmail}
+              setAuthMode={setAuthMode}
+              setAuthPassword={setAuthPassword}
+            />
+          }
+        />
+        <Route
+          path="/legacy-setup"
           element={
             <SetupPage
               addArtist={addArtist}
@@ -2989,6 +3914,43 @@ function App() {
         />
         <Route
           path="/game"
+          element={
+            <CompetitiveGamePage
+              audioBlocked={audioBlocked}
+              audioReady={audioReady}
+              currentRound={currentRound}
+              finalAccuracy={finalAccuracy}
+              formatScoreLabel={formatScoreLabel}
+              gameState={gameState}
+              goToNextRound={goToNextRound}
+              hasRounds={rounds.length > 0}
+              history={history}
+              leaderboardError={leaderboardError}
+              leaderboardState={leaderboardState}
+              leaderboardTargets={leaderboardTargets}
+              onBackToSetup={goBackToSetup}
+              onNameChange={setPlayerName}
+              onSubmitScore={submitScore}
+              playerName={playerName}
+              progressPercent={progressPercent}
+              replaySnippet={replaySnippet}
+              restartGame={restartGame}
+              roundCount={gameContext?.roundCount ?? roundCount}
+              roundIndex={roundIndex}
+              roundResult={roundResult}
+              rounds={rounds}
+              score={score}
+              sessionMode={gameContext?.mode ?? 'solo'}
+              submissionError={submissionError}
+              submissionState={submissionState}
+              submitAnswer={submitAnswer}
+              timeLeftMs={timeLeftMs}
+              liveScoreboard={liveScoreboard}
+            />
+          }
+        />
+        <Route
+          path="/legacy-game"
           element={
             <GamePage
               audioBlocked={audioBlocked}

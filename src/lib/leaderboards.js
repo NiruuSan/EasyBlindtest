@@ -57,3 +57,23 @@ export async function submitLeaderboardEntries({
     throw error
   }
 }
+
+export async function fetchGlobalLeaderboard(limit = LEADERBOARD_LIMIT) {
+  if (!supabase) {
+    throw new Error('Supabase is not configured.')
+  }
+
+  const { data, error } = await supabase
+    .from(LEADERBOARD_TABLE)
+    .select('id, display_name, score, accuracy, round_count, source_name, created_at')
+    .order('score', { ascending: false })
+    .order('accuracy', { ascending: false })
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    throw error
+  }
+
+  return data ?? []
+}
