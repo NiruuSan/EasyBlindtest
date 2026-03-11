@@ -12,6 +12,7 @@ import {
   fetchMultiplayerScoreboard,
   fetchPreset,
   fetchProfile,
+  fetchOneVOneMatchByCode,
   fetchPublicLobbies,
   fetchPublicOneVOneMatches,
   fetchSession,
