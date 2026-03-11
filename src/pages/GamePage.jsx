@@ -64,6 +64,7 @@ function GamePage({
   leaderboardState,
   leaderboardTargets,
   liveScoreboard,
+  matchJoinCode,
   onBackToSetup,
   onNameChange,
   onSubmitScore,
@@ -113,6 +114,11 @@ function GamePage({
             <p>Listen fast, answer faster, and protect your score.</p>
           </div>
           <div className="game-header-actions">
+            {matchJoinCode ? (
+              <span className="score-pill" title="Share this code with your opponent">
+                Code: {matchJoinCode}
+              </span>
+            ) : null}
             <button type="button" className="text-button" onClick={onBackToSetup}>
               Back
             </button>

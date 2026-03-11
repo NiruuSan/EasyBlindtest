@@ -3357,6 +3357,11 @@ function App() {
         rounds: snapshot.rounds,
       })
 
+      setMyMatches((prev) => [match, ...prev])
+      if (match.visibility === 'public') {
+        setPublicMatches((prev) => [match, ...prev])
+      }
+
       setRounds(snapshot.rounds)
       setRoundIndex(0)
       setScore(0)
@@ -3807,7 +3812,7 @@ function App() {
               setSearchState={setSearchState}
               setSearchTerm={setSearchTerm}
               setVisibility={setOneVOneVisibility}
-              submitDisabled={!session}
+              submitDisabled={false}
               visibility={oneVOneVisibility}
             />
           }
@@ -3846,7 +3851,7 @@ function App() {
               setSearchResults={setSearchResults}
               setSearchState={setSearchState}
               setSearchTerm={setSearchTerm}
-              submitDisabled={!session}
+              submitDisabled={false}
             />
           }
         />
@@ -3941,6 +3946,7 @@ function App() {
               roundResult={roundResult}
               rounds={rounds}
               score={score}
+              matchJoinCode={gameContext?.match?.join_code ?? null}
               sessionMode={gameContext?.mode ?? 'solo'}
               submissionError={submissionError}
               submissionState={submissionState}
