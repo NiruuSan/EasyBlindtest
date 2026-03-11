@@ -65,6 +65,7 @@ function GamePage({
   leaderboardTargets,
   liveScoreboard,
   matchJoinCode,
+  matchResult,
   onBackToSetup,
   onNameChange,
   onSubmitScore,
@@ -290,6 +291,31 @@ function GamePage({
                 </div>
               </section>
             ) : null}
+
+            {sessionMode === 'one_v_one' && (
+              <div className="match-result-panel">
+                <h3 className="panel-heading">Match results</h3>
+                {matchResult && matchResult.length > 0 ? (
+                  <div className="match-scores">
+                    {matchResult
+                      .slice()
+                      .sort((a, b) => b.score - a.score)
+                      .map((result, i) => (
+                        <div key={result.user_id} className={`match-score-row ${i === 0 ? 'winner' : ''}`}>
+                          <span className="player-name">
+                            {result.display_name}
+                            {i === 0 && ' 🏆'}
+                          </span>
+                          <span className="player-score">{result.score} pts</span>
+                          <span className="player-accuracy">{result.accuracy}%</span>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <p className="waiting-text">Waiting for your opponent to finish…</p>
+                )}
+              </div>
+            )}
 
             <div className="final-score-actions">
               <button type="button" className="secondary-button" onClick={onBackToSetup}>

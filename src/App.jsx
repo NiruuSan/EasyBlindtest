@@ -4,15 +4,19 @@ import './App.css'
 import { fetchGlobalLeaderboard, fetchLeaderboard, submitLeaderboardEntries } from './lib/leaderboards'
 import { isSupabaseConfigured, supabase } from './lib/supabase'
 import {
+  activateOneVOneMatch,
+  claimPrivateOneVOneMatch,
   createMultiplayerLobby,
   createOneVOneMatch,
   ensureProfile,
   fetchLobbyByCode,
   fetchLobbyPlayers,
   fetchMultiplayerScoreboard,
+  fetchOneVOneMatch,
+  fetchOneVOneMatchByCode,
+  fetchOneVOneMatchResults,
   fetchPreset,
   fetchProfile,
-  fetchOneVOneMatchByCode,
   fetchPublicLobbies,
   fetchPublicOneVOneMatches,
   fetchSession,
@@ -39,6 +43,7 @@ import MultiplayerPage from './pages/MultiplayerPage'
 import LeaderboardPage from './pages/LeaderboardPage'
 import AccountPage from './pages/AccountPage'
 import CompetitiveGamePage from './pages/GamePage'
+import MatchLobbyPage from './pages/MatchLobbyPage'
 
 const ROUND_OPTIONS = [5, 10, 15, 20]
 const ROUND_DURATION_MS = 30000
@@ -1321,7 +1326,9 @@ function pickRandomItems(items, count) {
 }
 
 function calculatePoints(timeLeftMs) {
-  return Math.max(0, Math.round((timeLeftMs / ROUND_DURATION_MS) * 100))
+  const GRACE_PERIOD_MS = 1000
+  if (timeLeftMs >= ROUND_DURATION_MS - GRACE_PERIOD_MS) return 100
+  return Math.max(0, Math.round((timeLeftMs / (ROUND_DURATION_MS - GRACE_PERIOD_MS)) * 100))
 }
 
 function formatSeconds(ms) {
@@ -2598,6 +2605,9 @@ function App() {
   const [oneVOneTab, setOneVOneTab] = useState('unranked')
   const [oneVOneVisibility, setOneVOneVisibility] = useState('public')
   const [matchJoinCode, setMatchJoinCode] = useState('')
+  const [waitingMatch, setWaitingMatch] = useState(null)
+  const [waitingMatchRounds, setWaitingMatchRounds] = useState([])
+  const [matchResult, setMatchResult] = useState(null)
   const [publicLobbies, setPublicLobbies] = useState([])
   const [lobbyJoinCode, setLobbyJoinCode] = useState('')
   const [currentLobby, setCurrentLobby] = useState(null)
@@ -2707,27 +2717,18 @@ function App() {
     let isCancelled = false
 
     async function loadDiscoveryData() {
-      try {
-        const [nextTrending, nextGlobal, nextPublicMatches, nextPublicLobbies] = await Promise.all([
-          fetchTrendingBlindtests(8),
-          fetchGlobalLeaderboard(8),
-          currentUserId ? fetchPublicOneVOneMatches(oneVOneTab) : Promise.resolve([]),
-          currentUserId ? fetchPublicLobbies() : Promise.resolve([]),
-        ])
+      const [trendingResult, leaderboardResult, matchesResult, lobbiesResult] = await Promise.allSettled([
+        fetchTrendingBlindtests(8),
+        fetchGlobalLeaderboard(8),
+        currentUserId ? fetchPublicOneVOneMatches(oneVOneTab) : Promise.resolve([]),
+        currentUserId ? fetchPublicLobbies() : Promise.resolve([]),
+      ])
 
-        if (!isCancelled) {
-          setTrendingBlindtests(nextTrending)
-          setGlobalLeaderboard(nextGlobal)
-          setPublicMatches(nextPublicMatches)
-          setPublicLobbies(nextPublicLobbies)
-        }
-      } catch {
-        if (!isCancelled) {
-          setTrendingBlindtests([])
-          setGlobalLeaderboard([])
-          setPublicMatches([])
-          setPublicLobbies([])
-        }
+      if (!isCancelled) {
+        setTrendingBlindtests(trendingResult.status === 'fulfilled' ? trendingResult.value : [])
+        setGlobalLeaderboard(leaderboardResult.status === 'fulfilled' ? leaderboardResult.value : [])
+        setPublicMatches(matchesResult.status === 'fulfilled' ? matchesResult.value : [])
+        setPublicLobbies(lobbiesResult.status === 'fulfilled' ? lobbiesResult.value : [])
       }
     }
 
@@ -2922,6 +2923,11 @@ function App() {
             correctAnswers,
             totalRounds: history.length,
           })
+
+          const results = await fetchOneVOneMatchResults(gameContext.match.id)
+          if (!isCancelled) {
+            setMatchResult(results)
+          }
 
           const nextMatches = await fetchUserOneVOneMatches(currentUserId)
           setMyMatches(nextMatches)
@@ -3348,6 +3354,7 @@ function App() {
 
     try {
       const snapshot = await buildBlindtestSnapshot({ requireSingleSource: true })
+      const isPrivate = oneVOneTab === 'unranked' && oneVOneVisibility === 'private'
       const match = await createOneVOneMatch({
         createdBy: currentUserId,
         visibility: oneVOneTab === 'ranked' ? 'public' : oneVOneVisibility,
@@ -3357,25 +3364,31 @@ function App() {
         rounds: snapshot.rounds,
       })
 
-      setMyMatches((prev) => [match, ...prev])
-      if (match.visibility === 'public') {
-        setPublicMatches((prev) => [match, ...prev])
+      if (isPrivate) {
+        setWaitingMatch(match)
+        setWaitingMatchRounds(snapshot.rounds)
+        setGameState('setup')
+        navigate('/match-lobby')
+      } else {
+        setMyMatches((prev) => [match, ...prev])
+        if (match.visibility === 'public') {
+          setPublicMatches((prev) => [match, ...prev])
+        }
+        setRounds(snapshot.rounds)
+        setRoundIndex(0)
+        setScore(0)
+        setHistory([])
+        setRoundResult(null)
+        setTimeLeftMs(ROUND_DURATION_MS)
+        setGameContext({
+          leaderboardSources: snapshot.sources,
+          mode: 'one_v_one',
+          match,
+          roundCount,
+        })
+        setGameState('playing')
+        navigate('/game')
       }
-
-      setRounds(snapshot.rounds)
-      setRoundIndex(0)
-      setScore(0)
-      setHistory([])
-      setRoundResult(null)
-      setTimeLeftMs(ROUND_DURATION_MS)
-      setGameContext({
-        leaderboardSources: snapshot.sources,
-        mode: 'one_v_one',
-        match,
-        roundCount,
-      })
-      setGameState('playing')
-      navigate('/game')
     } catch (error) {
       setGameState('setup')
       setGameError(error.message || 'Could not create the 1v1 match.')
@@ -3388,36 +3401,83 @@ function App() {
       return
     }
 
-    try {
-      const match = await fetchOneVOneMatchByCode(matchJoinCode.trim())
+    if (!matchJoinCode.trim()) {
+      setGameError('Enter a match code to join.')
+      return
+    }
 
-      if (!match) {
-        throw new Error('No match was found for that code.')
+    setGameError('')
+
+    try {
+      const match = await fetchOneVOneMatchByCode(matchJoinCode.trim().toUpperCase())
+
+      if (match.created_by === currentUserId) {
+        setGameError('You cannot join your own match.')
+        return
       }
 
-      const claimedMatch =
-        match.opponent_id || match.created_by === currentUserId
-          ? match
-          : await joinOneVOneMatch(match.id, currentUserId)
+      if (match.status === 'completed' || match.status === 'cancelled') {
+        setGameError('This match is no longer available.')
+        return
+      }
+
+      const claimedMatch = match.opponent_id
+        ? match
+        : await claimPrivateOneVOneMatch(match.id, currentUserId)
+
       const preset = await fetchPreset(claimedMatch.preset_id)
 
-      setRounds(preset.rounds)
+      setWaitingMatch(claimedMatch)
+      setWaitingMatchRounds(preset.rounds)
+      navigate('/match-lobby')
+    } catch (error) {
+      setGameError(error.message || 'Could not join the match. Check the code and try again.')
+    }
+  }
+
+  async function handleStartOneVOneMatch() {
+    if (!waitingMatch) return
+
+    try {
+      const activatedMatch = await activateOneVOneMatch(waitingMatch.id)
+      setRounds(waitingMatchRounds)
       setRoundIndex(0)
       setScore(0)
       setHistory([])
       setRoundResult(null)
       setTimeLeftMs(ROUND_DURATION_MS)
+      setAudioBlocked(false)
+      setAudioReady(false)
       setGameContext({
         leaderboardSources: [],
         mode: 'one_v_one',
-        match: claimedMatch,
-        roundCount: claimedMatch.round_count,
+        match: activatedMatch,
+        roundCount: waitingMatch.round_count,
       })
       setGameState('playing')
       navigate('/game')
     } catch (error) {
-      setGameError(error.message || 'Could not join the private match.')
+      setGameError(error.message || 'Could not start the match.')
     }
+  }
+
+  function handleOpponentStartedMatch() {
+    setRounds(waitingMatchRounds)
+    setRoundIndex(0)
+    setScore(0)
+    setHistory([])
+    setRoundResult(null)
+    setTimeLeftMs(ROUND_DURATION_MS)
+    setAudioBlocked(false)
+    setAudioReady(false)
+    setGameContext({
+      leaderboardSources: [],
+      mode: 'one_v_one',
+      match: waitingMatch,
+      roundCount: waitingMatch?.round_count ?? 10,
+    })
+    setGameState('playing')
+    navigate('/game')
   }
 
   async function handleJoinPublicMatch(matchId) {
@@ -3599,6 +3659,9 @@ function App() {
     setTimeLeftMs(ROUND_DURATION_MS)
     setAudioBlocked(false)
     setAudioReady(false)
+    setWaitingMatch(null)
+    setWaitingMatchRounds([])
+    setMatchResult(null)
     navigate(
       gameContext?.mode === 'one_v_one'
         ? '/one-v-one'
@@ -3818,6 +3881,22 @@ function App() {
           }
         />
         <Route
+          path="/match-lobby"
+          element={
+            <MatchLobbyPage
+              currentUserId={currentUserId}
+              waitingMatch={waitingMatch}
+              onStartMatch={handleStartOneVOneMatch}
+              onMatchStarted={handleOpponentStartedMatch}
+              onLeave={() => {
+                setWaitingMatch(null)
+                setWaitingMatchRounds([])
+                navigate('/one-v-one')
+              }}
+            />
+          }
+        />
+        <Route
           path="/multiplayer"
           element={
             <MultiplayerPage
@@ -3947,7 +4026,8 @@ function App() {
               rounds={rounds}
               score={score}
               matchJoinCode={gameContext?.match?.join_code ?? null}
-              sessionMode={gameContext?.mode ?? 'solo'}
+              matchResult={matchResult}
+              sessionMode={gameContext?.mode === 'one_v_one' ? 'one_v_one' : gameContext?.mode === 'multiplayer' ? 'multiplayer' : 'solo'}
               submissionError={submissionError}
               submissionState={submissionState}
               submitAnswer={submitAnswer}

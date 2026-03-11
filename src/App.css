@@ -1310,3 +1310,134 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Match lobby page */
+.match-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.meta-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.meta-label {
+  color: var(--text-secondary, #888);
+  font-size: 14px;
+}
+
+.meta-value {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.join-code-display {
+  background: var(--bg-secondary, #1a1a2e);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  margin: 8px 0;
+}
+
+.join-code-text {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  font-family: monospace;
+}
+
+.hint-text {
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.status-ready,
+.status-waiting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.status-dot.ready {
+  background: #4ade80;
+}
+
+.status-dot.waiting {
+  background: #888;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.panel-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* Match result panel */
+.match-result-panel {
+  margin-top: 24px;
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--bg-secondary, #1a1a2e);
+}
+
+.match-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.match-score-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--bg-tertiary, #12122a);
+}
+
+.match-score-row.winner {
+  border: 1px solid #a78bfa;
+  background: rgba(167, 139, 250, 0.08);
+}
+
+.player-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.player-score {
+  font-weight: 700;
+  color: #a78bfa;
+}
+
+.player-accuracy {
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+  min-width: 40px;
+  text-align: right;
+}
+
+.waiting-text {
+  color: var(--text-secondary, #888);
+  font-size: 14px;
+  margin-top: 8px;
+}

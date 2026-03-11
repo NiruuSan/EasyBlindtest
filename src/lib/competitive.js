@@ -756,6 +756,68 @@ export async function fetchMultiplayerScoreboard(lobbyId) {
     .sort((left, right) => right.score - left.score)
 }
 
+export async function claimPrivateOneVOneMatch(matchId, userId) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from(ONE_V_ONE_MATCHES_TABLE)
+    .update({ opponent_id: userId })
+    .is('opponent_id', null)
+    .eq('id', matchId)
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function activateOneVOneMatch(matchId) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from(ONE_V_ONE_MATCHES_TABLE)
+    .update({ status: 'active' })
+    .eq('id', matchId)
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function fetchOneVOneMatch(matchId) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from(ONE_V_ONE_MATCHES_TABLE)
+    .select('*')
+    .eq('id', matchId)
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return data
+}
+
+export async function fetchOneVOneMatchResults(matchId) {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .from(ONE_V_ONE_RESULTS_TABLE)
+    .select('*')
+    .eq('match_id', matchId)
+
+  if (error) {
+    throw error
+  }
+
+  return data ?? []
+}
+
 export function subscribeToLobby(lobbyId, onEvent) {
   const client = requireSupabase()
 
